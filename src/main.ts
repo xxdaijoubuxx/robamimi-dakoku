@@ -1,6 +1,11 @@
 import './style.css'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { firebaseAuth } from './firebase/client'
+import {
+  draftFromRecord,
+  localDateTimeToIso,
+  type RecordDraft,
+} from './history/editor'
 import { groupHistoryEntries, historyTimeLabel } from './history/view'
 import { isOwnerUid } from './firebase/owner'
 import { createMemoAutosave, type MemoSaveState } from './memo/autosave'
@@ -10,7 +15,13 @@ import {
 } from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
-import { getHistoryEntries, updateMemoBody } from './storage/database'
+import {
+  getHistoryEntries,
+  getRecordById,
+  updateMemoBody,
+  updateRecord,
+  type RecordChanges,
+} from './storage/database'
 import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
 
 const BASE_URL = import.meta.env.BASE_URL
@@ -47,6 +58,10 @@ function formatTime(isoDate: string): string {
     hour: '2-digit',
     minute: '2-digit',
   }).format(new Date(isoDate))
+}
+
+function currentTimezone(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
 }
 
 function savedActionMarkup(record: RecordData, hasRecentSameKind: boolean): string {
@@ -111,7 +126,7 @@ function renderMemo(record: RecordData): void {
     throw new Error('メモ入力欄を初期化できません。')
   }
 
-  const autosave = createMemoAutosave(
+  const autosave = createMemoAutosave<string>(
     async (body) => {
       await updateMemoBody(record.id, body)
     },
@@ -290,13 +305,153 @@ function historyRecordMarkup(entry: HistoryEntry): string {
     : ''
 
   return `
-    <article class="history-record" data-record-id="${escapeHtml(record.id)}">
+    <a class="history-record" href="${BASE_URL}history/?record=${encodeURIComponent(record.id)}">
       <time datetime="${escapeHtml(record.occurredAt)}">${escapeHtml(historyTimeLabel(record.occurredAt, record.timezone))}</time>
       <strong class="history-kind ${record.kind}">${escapeHtml(labelFor(record.kind))}</strong>
       ${syncStatusMarkup(syncStatus)}
       ${body}
-    </article>
+    </a>
   `
+}
+
+function showEditorSaveState(state: MemoSaveState): void {
+  const status = app.querySelector<HTMLElement>('[data-editor-save-status]')
+  const retry = app.querySelector<HTMLButtonElement>('[data-editor-save-retry]')
+  if (!status || !retry) {
+    return
+  }
+  status.textContent = {
+    saved: '✓ 自動保存済み',
+    saving: '… 保存中',
+    failed: '⚠ 未保存',
+  }[state]
+  status.dataset.state = state
+  retry.hidden = state !== 'failed'
+}
+
+async function renderRecordEditor(recordId: string): Promise<void> {
+  const record = await getRecordById(recordId)
+  if (!record) {
+    app.innerHTML = `
+      <section class="shell" aria-labelledby="page-title">
+        <p class="eyebrow">履歴編集</p>
+        <h1 id="page-title">記録が見つかりません</h1>
+        <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+      </section>
+    `
+    return
+  }
+
+  let lastSavedDraft = draftFromRecord(record)
+  app.innerHTML = `
+    <section class="shell editor-shell" aria-labelledby="page-title">
+      <p class="eyebrow">履歴編集</p>
+      <h1 id="page-title">記録を修正</h1>
+      <div class="editor-field">
+        <label for="record-kind">種類</label>
+        <select id="record-kind">
+          <option value="wake"${record.kind === 'wake' ? ' selected' : ''}>起床</option>
+          <option value="sleep"${record.kind === 'sleep' ? ' selected' : ''}>就寝</option>
+          <option value="memo"${record.kind === 'memo' ? ' selected' : ''}>メモ</option>
+        </select>
+      </div>
+      <div class="editor-field">
+        <label for="record-datetime">日時（この端末の現地時刻）</label>
+        <input id="record-datetime" type="datetime-local" value="${escapeHtml(lastSavedDraft.localDateTime)}" required>
+      </div>
+      <div class="editor-field" data-editor-body-field${record.kind === 'memo' ? '' : ' hidden'}>
+        <label for="record-body">本文</label>
+        <textarea id="record-body" rows="7">${escapeHtml(record.body)}</textarea>
+      </div>
+      <div class="editor-save-status" aria-live="polite">
+        <p data-editor-save-status data-state="saved">✓ 自動保存済み</p>
+        <p class="sync-pending">↻ 同期待ち</p>
+      </div>
+      <button class="primary-button" type="button" data-editor-save-retry hidden>保存を再試行</button>
+      <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+    </section>
+  `
+
+  const kindInput = app.querySelector<HTMLSelectElement>('#record-kind')
+  const dateTimeInput = app.querySelector<HTMLInputElement>('#record-datetime')
+  const bodyInput = app.querySelector<HTMLTextAreaElement>('#record-body')
+  const bodyField = app.querySelector<HTMLElement>('[data-editor-body-field]')
+  const retry = app.querySelector<HTMLButtonElement>('[data-editor-save-retry]')
+  if (!kindInput || !dateTimeInput || !bodyInput || !bodyField || !retry) {
+    throw new Error('編集画面を初期化できません。')
+  }
+
+  function readDraft(): RecordDraft {
+    const kind = kindInput?.value
+    if (kind !== 'wake' && kind !== 'sleep' && kind !== 'memo') {
+      throw new Error('記録の種類が不正です。')
+    }
+    return {
+      kind,
+      localDateTime: dateTimeInput?.value ?? '',
+      body: kind === 'memo' ? (bodyInput?.value ?? '') : '',
+    }
+  }
+
+  const autosave = createMemoAutosave<RecordDraft>(
+    async (draft: RecordDraft) => {
+      const changes: RecordChanges = { kind: draft.kind, body: draft.body }
+      if (draft.localDateTime !== lastSavedDraft.localDateTime) {
+        changes.occurredAt = localDateTimeToIso(draft.localDateTime)
+        changes.timezone = currentTimezone()
+      }
+      const updatedRecord = await updateRecord(record.id, changes)
+      lastSavedDraft = draftFromRecord(updatedRecord)
+    },
+    showEditorSaveState,
+  )
+  let composing = false
+
+  kindInput.addEventListener('change', () => {
+    const nextKind = kindInput.value
+    if (nextKind !== 'memo' && bodyInput.value !== '') {
+      const confirmed = window.confirm('種類を変更するとメモ本文は空になります。変更しますか？')
+      if (!confirmed) {
+        kindInput.value = 'memo'
+        return
+      }
+      bodyInput.value = ''
+    }
+    bodyField.hidden = nextKind !== 'memo'
+    autosave.schedule(readDraft())
+    void autosave.flush()
+  })
+  dateTimeInput.addEventListener('input', () => {
+    autosave.schedule(readDraft())
+  })
+  bodyInput.addEventListener('compositionstart', () => {
+    composing = true
+  })
+  bodyInput.addEventListener('compositionend', () => {
+    composing = false
+    autosave.schedule(readDraft())
+  })
+  bodyInput.addEventListener('input', () => {
+    if (!composing) {
+      autosave.schedule(readDraft())
+    }
+  })
+  for (const input of [dateTimeInput, bodyInput]) {
+    input.addEventListener('blur', () => {
+      void autosave.flush()
+    })
+  }
+  retry.addEventListener('click', () => {
+    void autosave.retry()
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void autosave.flush()
+    }
+  })
+  window.addEventListener('pagehide', () => {
+    void autosave.flush()
+  })
 }
 
 async function renderHistory(): Promise<void> {
@@ -343,7 +498,12 @@ async function start(): Promise<void> {
     return
   }
   if (entry === 'history') {
-    await renderHistory()
+    const recordId = new URLSearchParams(window.location.search).get('record')
+    if (recordId) {
+      await renderRecordEditor(recordId)
+    } else {
+      await renderHistory()
+    }
     return
   }
   if (entry === 'wake' || entry === 'sleep' || entry === 'memo') {

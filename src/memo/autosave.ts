@@ -1,19 +1,19 @@
 export type MemoSaveState = 'saved' | 'saving' | 'failed'
 
-export interface MemoAutosave {
-  schedule(value: string): void
+export interface MemoAutosave<Value> {
+  schedule(value: Value): void
   flush(): Promise<void>
   retry(): Promise<void>
 }
 
-export function createMemoAutosave(
-  save: (value: string) => Promise<void>,
+export function createMemoAutosave<Value>(
+  save: (value: Value) => Promise<void>,
   onStateChange: (state: MemoSaveState) => void,
   delayMilliseconds = 250,
-): MemoAutosave {
+): MemoAutosave<Value> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  let pendingSave: { value: string; generation: number } | undefined
-  let failedValue: string | undefined
+  let pendingSave: { value: Value; generation: number } | undefined
+  let failedSave: { value: Value } | undefined
   let latestGeneration = 0
   let saveChain = Promise.resolve()
 
@@ -36,12 +36,12 @@ export function createMemoAutosave(
       try {
         await save(value)
         if (generation === latestGeneration) {
-          failedValue = undefined
+          failedSave = undefined
           onStateChange('saved')
         }
       } catch {
         if (generation === latestGeneration) {
-          failedValue = value
+          failedSave = { value }
           onStateChange('failed')
         }
       }
@@ -52,7 +52,7 @@ export function createMemoAutosave(
   return {
     schedule(value) {
       pendingSave = { value, generation: ++latestGeneration }
-      failedValue = undefined
+      failedSave = undefined
       onStateChange('saving')
       clearTimer()
       timer = setTimeout(() => {
@@ -63,9 +63,9 @@ export function createMemoAutosave(
       return queuePendingSave()
     },
     retry() {
-      if (failedValue !== undefined) {
-        pendingSave = { value: failedValue, generation: ++latestGeneration }
-        failedValue = undefined
+      if (failedSave !== undefined) {
+        pendingSave = { value: failedSave.value, generation: ++latestGeneration }
+        failedSave = undefined
         onStateChange('saving')
       }
       return queuePendingSave()

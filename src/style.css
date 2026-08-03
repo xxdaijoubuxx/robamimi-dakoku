@@ -334,7 +334,15 @@ h1 {
   gap: 6px 10px;
   align-items: baseline;
   padding: 14px 16px;
+  color: inherit;
   background: #fffdf9;
+  text-decoration: none;
+}
+
+.history-record:focus-visible {
+  position: relative;
+  outline: 3px solid #52795a;
+  outline-offset: -3px;
 }
 
 .history-record time {
@@ -382,6 +390,74 @@ h1 {
   -webkit-line-clamp: 3;
 }
 
+.editor-shell {
+  display: grid;
+  gap: 20px;
+}
+
+.editor-shell h1 {
+  margin-bottom: 4px;
+}
+
+.editor-field {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-field label {
+  font-weight: 700;
+}
+
+.editor-field select,
+.editor-field input,
+.editor-field textarea {
+  width: 100%;
+  min-height: 46px;
+  box-sizing: border-box;
+  border: 1px solid #b9ab9d;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: inherit;
+  background: #fffdf9;
+  font: inherit;
+}
+
+.editor-field textarea {
+  min-height: 11rem;
+  resize: vertical;
+  line-height: 1.6;
+}
+
+.editor-field select:focus,
+.editor-field input:focus,
+.editor-field textarea:focus {
+  border-color: #52795a;
+  outline: 3px solid rgb(145 179 151 / 35%);
+}
+
+.editor-save-status {
+  display: grid;
+  gap: 8px;
+}
+
+.editor-save-status p {
+  margin: 0;
+}
+
+[data-editor-save-status][data-state='saved'] {
+  color: #306c3b;
+  font-weight: 700;
+}
+
+[data-editor-save-status][data-state='saving'] {
+  color: #71675e;
+}
+
+[data-editor-save-status][data-state='failed'] {
+  color: #a22e28;
+  font-weight: 700;
+}
+
 .history-actions {
   display: flex;
   flex-wrap: wrap;
@@ -421,6 +497,13 @@ h1 {
   }
 
   .history-record {
+    background: #2b2723;
+  }
+
+  .editor-field select,
+  .editor-field input,
+  .editor-field textarea {
+    border-color: #62574d;
     background: #2b2723;
   }
 

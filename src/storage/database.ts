@@ -157,6 +157,12 @@ export async function getHistoryEntries(): Promise<HistoryEntry[]> {
     }))
 }
 
+export async function getRecordById(recordId: string): Promise<RecordData | null> {
+  const database = await readyDatabasePromise
+  const record = await database.get('records', recordId)
+  return record && isCurrentRecord(record) && record.deletedAt === null ? record : null
+}
+
 export async function hasPreviousRecordWithin(
   record: RecordData,
   intervalMilliseconds: number,
@@ -173,21 +179,37 @@ export async function hasPreviousRecordWithin(
   })
 }
 
-export async function updateMemoBody(recordId: string, body: string): Promise<RecordData> {
+export type RecordChanges = Partial<Pick<RecordData, 'kind' | 'occurredAt' | 'timezone' | 'body'>>
+
+export async function updateRecord(recordId: string, changes: RecordChanges): Promise<RecordData> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync'], 'readwrite')
   const storedRecord = await transaction.objectStore('records').get(recordId)
-  if (!storedRecord || !isCurrentRecord(storedRecord) || storedRecord.kind !== 'memo') {
-    throw new Error('更新するメモが見つかりません。')
+  if (!storedRecord || !isCurrentRecord(storedRecord) || storedRecord.deletedAt !== null) {
+    throw new Error('更新する記録が見つかりません。')
   }
-  if (storedRecord.body === body) {
+  const updatedValues = { ...storedRecord, ...changes }
+  if (!['wake', 'sleep', 'memo'].includes(updatedValues.kind)) {
+    throw new Error('記録の種類が不正です。')
+  }
+  if (updatedValues.kind !== 'memo' && updatedValues.body !== '') {
+    throw new Error('起床と就寝にはメモ本文を保存できません。')
+  }
+  if (Number.isNaN(new Date(updatedValues.occurredAt).getTime()) || updatedValues.timezone === '') {
+    throw new Error('記録の日時が不正です。')
+  }
+  if (
+    storedRecord.kind === updatedValues.kind
+    && storedRecord.occurredAt === updatedValues.occurredAt
+    && storedRecord.timezone === updatedValues.timezone
+    && storedRecord.body === updatedValues.body
+  ) {
     await transaction.done
     return storedRecord
   }
 
   const updatedRecord: RecordData = {
-    ...storedRecord,
-    body,
+    ...updatedValues,
     updatedAt: new Date().toISOString(),
     revision: storedRecord.revision + 1,
   }
@@ -203,6 +225,10 @@ export async function updateMemoBody(recordId: string, body: string): Promise<Re
   await transaction.objectStore('sync').put(updatedSync)
   await transaction.done
   return updatedRecord
+}
+
+export async function updateMemoBody(recordId: string, body: string): Promise<RecordData> {
+  return updateRecord(recordId, { body })
 }
 
 export async function deleteAllPrototypeData(): Promise<void> {
