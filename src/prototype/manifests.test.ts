@@ -16,7 +16,7 @@ const manifests = entries.map((entry) => {
 })
 
 describe('Web App Manifest', () => {
-  it('四つのPWA IDが重複しない', () => {
+  it('四つの入口用Manifest IDが重複しない', () => {
     const ids = manifests.map((manifest) => manifest.id)
     expect(new Set(ids).size).toBe(entries.length)
   })

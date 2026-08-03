@@ -1,5 +1,6 @@
 import './style.css'
 import { createPrototypeRecord, deleteAllPrototypeRecords, getPrototypeRecords } from './prototype/database'
+import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind, PrototypeRecord } from './prototype/types'
 
 const BASE_URL = import.meta.env.BASE_URL
@@ -63,13 +64,14 @@ function renderSetup(): void {
 
 function renderInstallPreview(kind: EntryKind): void {
   const label = labelFor(kind)
+  window.history.replaceState(null, '', `${BASE_URL}${kind}/#shortcut`)
   app.innerHTML = `
     <section class="shell action-shell ${kind}" aria-labelledby="page-title">
       <p class="eyebrow">ホーム画面へ追加する準備</p>
       <h1 id="page-title">${label}</h1>
       <p class="description">
-        このページではまだ記録しません。Chromeのメニューから「アプリをインストール」を
-        選んでください。「ホーム画面に追加」は別の方式なので使用しません。
+        このページではまだ記録しません。Chromeのメニューから「ホーム画面に追加」、続いて
+        「ショートカットを作成」を選び、ホーム画面名を「${label}」にしてください。
       </p>
       <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
     </section>
@@ -78,22 +80,6 @@ function renderInstallPreview(kind: EntryKind): void {
 
 async function renderAction(kind: EntryKind): Promise<void> {
   const label = labelFor(kind)
-  const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined
-  const isReload = navigation?.type === 'reload'
-  const previousId = sessionStorage.getItem(`robamimi:last:${kind}`)
-
-  if (isReload && previousId) {
-    app.innerHTML = `
-      <section class="shell action-shell ${kind}" aria-labelledby="page-title">
-        <p class="eyebrow">再読み込み</p>
-        <h1 id="page-title">${label}</h1>
-        <p class="result-message">再読み込みでは新しい記録を追加しませんでした。</p>
-        <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
-      </section>
-    `
-    return
-  }
-
   app.innerHTML = `
     <section class="shell action-shell ${kind}" aria-labelledby="page-title">
       <p class="eyebrow">端末内へ保存中</p>
@@ -104,7 +90,7 @@ async function renderAction(kind: EntryKind): Promise<void> {
 
   try {
     const record = await createPrototypeRecord(kind)
-    sessionStorage.setItem(`robamimi:last:${kind}`, record.id)
+    window.history.replaceState(null, '', completedLaunchUrl(BASE_URL, kind))
     app.innerHTML = `
       <section class="shell action-shell ${kind}" aria-labelledby="page-title">
         <p class="eyebrow">端末内保存</p>
@@ -129,6 +115,19 @@ async function renderAction(kind: EntryKind): Promise<void> {
       void renderAction(kind)
     })
   }
+}
+
+function renderCompletedReload(kind: EntryKind): void {
+  const label = labelFor(kind)
+  app.innerHTML = `
+    <section class="shell action-shell ${kind}" aria-labelledby="page-title">
+      <p class="eyebrow">記録済み画面</p>
+      <h1 id="page-title">${label}</h1>
+      <p class="result-message">この画面の再読み込みでは、新しい記録を追加しません。</p>
+      <p class="help">次の打刻はホーム画面の「${label}」を押してください。</p>
+      <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
+    </section>
+  `
 }
 
 function recordItem(record: PrototypeRecord): string {
@@ -189,9 +188,11 @@ async function start(): Promise<void> {
     return
   }
   if (entry === 'wake' || entry === 'sleep' || entry === 'memo') {
-    const installPreview = new URLSearchParams(window.location.search).get('install') === '1'
-    if (installPreview) {
+    const mode = launchMode(window.location.search)
+    if (mode === 'prepare') {
       renderInstallPreview(entry)
+    } else if (mode === 'completed') {
+      renderCompletedReload(entry)
     } else {
       await renderAction(entry)
     }
