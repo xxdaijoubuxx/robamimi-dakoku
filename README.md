@@ -12,7 +12,8 @@
 - 技術方式：GitHub Pages＋Chrome＋Firebaseで合意済み
 - 設計：合意済み
 - 試作公開：<https://xxdaijoubuxx.github.io/robamimi-dakoku/>
-- 次の作業：WBS 7.2.8「Android 16で四つの独立アイコンを追加」
+- Android 16最小試作：Chromeショートカット方式で合格
+- 次の作業：WBS 7.3.1「Firebaseプロジェクトを作成」
 
 ## 正本
 
