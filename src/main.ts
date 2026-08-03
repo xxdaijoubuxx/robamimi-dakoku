@@ -195,6 +195,11 @@ async function renderSetup(authMessage = ''): Promise<void> {
   const owner = user ? isOwnerUid(user.uid) : false
   if (user && owner) {
     await saveAuthenticatedOwner(user.uid)
+    try {
+      await syncPendingNewRecords()
+    } catch (error) {
+      console.error('初回ログイン後のFirebase取得に失敗しました。', error)
+    }
   }
 
   app.innerHTML = `

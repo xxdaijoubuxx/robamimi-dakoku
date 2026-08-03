@@ -2,7 +2,7 @@ import { Timestamp } from 'firebase/firestore'
 import { describe, expect, it } from 'vitest'
 import { OWNER_UID } from '../firebase/owner'
 import type { RecordData } from '../storage/types'
-import { firestoreRecord, recordDocumentPath } from './format'
+import { firestoreRecord, recordDocumentPath, recordFromFirestore } from './format'
 
 const record: RecordData = {
   id: 'record-123', kind: 'memo', occurredAt: '2026-08-03T12:00:00.000Z', timezone: 'Asia/Tokyo',
@@ -22,5 +22,13 @@ describe('新規記録のFirebase送信形式', () => {
     expect(converted.updatedAt).toBeInstanceOf(Timestamp)
     expect(converted).not.toHaveProperty('id')
     expect(converted.body).toBe('頭痛がした')
+  })
+
+  it('Firestore形式から同じID・内容へ戻す', () => {
+    expect(recordFromFirestore(record.id, firestoreRecord(record))).toEqual(record)
+  })
+
+  it('不正な日時型を端末へ取り込まない', () => {
+    expect(() => recordFromFirestore(record.id, { ...firestoreRecord(record), occurredAt: 'invalid' })).toThrow()
   })
 })

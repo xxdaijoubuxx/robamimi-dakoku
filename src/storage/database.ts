@@ -189,6 +189,33 @@ export async function getPendingNewRecords(): Promise<RecordData[]> {
     .filter((record) => isPendingNewRecord(record, syncByRecordId.get(record.id)))
 }
 
+export async function importRemoteRecords(records: RecordData[]): Promise<number> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync', 'settings'], 'readwrite')
+  let imported = 0
+  for (const record of records) {
+    const existing = await transaction.objectStore('records').get(record.id)
+    if (existing) continue
+    await transaction.objectStore('records').add(record)
+    await transaction.objectStore('sync').put({
+      recordId: record.id,
+      status: 'synced',
+      syncedRevision: record.revision,
+      lastAttemptAt: new Date().toISOString(),
+      errorCode: null,
+      syncedRecord: record,
+      remoteRecord: null,
+    })
+    imported += 1
+  }
+  if (imported > 0) {
+    const settings = await transaction.objectStore('settings').get('main')
+    if (settings) await transaction.objectStore('settings').put({ ...settings, lastSyncAt: new Date().toISOString() })
+  }
+  await transaction.done
+  return imported
+}
+
 export async function markRecordSynced(uploadedRecord: RecordData): Promise<boolean> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync', 'settings'], 'readwrite')

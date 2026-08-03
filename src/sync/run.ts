@@ -1,9 +1,11 @@
 import { getPendingNewRecords } from '../storage/database'
 import { uploadNewRecord, type UploadOutcome } from './upload'
+import { downloadRemoteRecords } from './download'
 
 export interface SyncRunResult {
   total: number
   outcomes: Record<UploadOutcome, number>
+  downloaded: number
 }
 
 let activeRun: Promise<SyncRunResult> | null = null
@@ -19,7 +21,8 @@ export function syncPendingNewRecords(): Promise<SyncRunResult> {
     for (const record of records) {
       outcomes[await uploadNewRecord(record)] += 1
     }
-    return { total: records.length, outcomes }
+    const downloaded = await downloadRemoteRecords()
+    return { total: records.length + downloaded, outcomes, downloaded }
   })().finally(() => {
     activeRun = null
   })
