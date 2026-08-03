@@ -11,6 +11,7 @@ import type {
   SyncStatus,
 } from './types'
 import type { PrototypeRecord } from '../prototype/types'
+import { authenticateDevice } from '../auth/device'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
 
@@ -105,6 +106,23 @@ const readyDatabasePromise = databasePromise.then(async (database) => {
   await migrateVersionOneData(database)
   return database
 })
+
+export async function getAppSettings(): Promise<AppSettings> {
+  const database = await readyDatabasePromise
+  const settings = await database.get('settings', 'main')
+  if (!settings) {
+    throw new Error('端末設定が初期化されていません。')
+  }
+  return settings
+}
+
+export async function saveAuthenticatedOwner(uid: string): Promise<AppSettings> {
+  const database = await readyDatabasePromise
+  const settings = await getAppSettings()
+  const authenticated = authenticateDevice(settings, uid)
+  await database.put('settings', authenticated)
+  return authenticated
+}
 
 export async function createRecord(kind: EntryKind): Promise<RecordData> {
   const database = await readyDatabasePromise

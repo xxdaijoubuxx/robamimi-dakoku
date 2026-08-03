@@ -8,6 +8,7 @@ import {
 } from './history/editor'
 import { groupHistoryEntries, historyDateLabel, historyTimeLabel } from './history/view'
 import { isOwnerUid } from './firebase/owner'
+import { isDailyUseConfigured } from './auth/device'
 import { createMemoAutosave, type MemoSaveState } from './memo/autosave'
 import {
   createPrototypeRecord,
@@ -17,9 +18,11 @@ import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
   getHistoryEntries,
+  getAppSettings,
   getRecentlyDeletedRecords,
   getRecordById,
   restoreRecord,
+  saveAuthenticatedOwner,
   softDeleteRecord,
   updateMemoBody,
   updateRecord,
@@ -168,18 +171,21 @@ function renderMemo(record: RecordData): void {
 
 async function renderSetup(authMessage = ''): Promise<void> {
   const auth = firebaseAuth()
+  await auth.authStateReady()
   const user = auth.currentUser
   const owner = user ? isOwnerUid(user.uid) : false
+  if (user && owner) {
+    await saveAuthenticatedOwner(user.uid)
+  }
 
   app.innerHTML = `
     <section class="shell" aria-labelledby="page-title">
-      <p class="eyebrow">最小試作</p>
+      <p class="eyebrow">初回設定</p>
       <h1 id="page-title">ろばみみ打刻</h1>
       <p class="description">
-        四つの入口がAndroidのホーム画面で独立し、圏外でも同じ端末内データを使えるか確認します。
-        Firebaseへの送信はまだ行いません。
+        最初にGoogleで本人確認します。確認済みのこの端末では、圏外でも端末内へ記録できます。
       </p>
-      <nav class="entry-grid" aria-label="試作入口">
+      <nav class="entry-grid" aria-label="ホーム画面入口の準備">
         <a class="entry wake" href="${BASE_URL}wake/?install=1">起床を準備</a>
         <a class="entry sleep" href="${BASE_URL}sleep/?install=1">就寝を準備</a>
         <a class="entry memo" href="${BASE_URL}memo/?install=1">メモを準備</a>
@@ -191,10 +197,12 @@ async function renderSetup(authMessage = ''): Promise<void> {
         ${authMessage}
         ${
           user && owner
-            ? `<p class="result-message success">✓ Googleログイン済み</p>
+            ? `<p class="result-message success">✓ 本人確認済み</p>
+               <p class="help">この端末では、圏外でも端末内へ記録できます。</p>
                <p class="help">本人UID（パスワードではありません）</p>
                <code>${escapeHtml(user.uid)}</code>
-               <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
+               <button class="primary-button" type="button" data-sign-out>Googleからログアウト</button>
+               <p class="help">ログアウトしても、この端末の記録と本人確認済み設定は消えません。</p>`
             : user
               ? `<p class="result-message">このGoogleアカウントは、ろばみみ打刻の本人として登録されていません。</p>
                  <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
@@ -217,6 +225,17 @@ async function renderSetup(authMessage = ''): Promise<void> {
     await signOut(auth)
     await renderSetup()
   })
+}
+
+function renderSetupRequired(): void {
+  app.innerHTML = `
+    <section class="shell action-shell error" aria-labelledby="page-title">
+      <p class="eyebrow">初回設定が必要です</p>
+      <h1 id="page-title">まだ記録していません</h1>
+      <p class="result-message">この端末は、ろばみみ打刻の本人確認が済んでいません。</p>
+      <a class="primary-button" href="${BASE_URL}">初回設定を開く</a>
+    </section>
+  `
 }
 
 function renderInstallPreview(kind: EntryKind): void {
@@ -573,6 +592,12 @@ async function start(): Promise<void> {
 
   if (entry === 'setup') {
     await renderSetup()
+    return
+  }
+
+  const settings = await getAppSettings()
+  if (!isDailyUseConfigured(settings)) {
+    renderSetupRequired()
     return
   }
   if (entry === 'history') {
