@@ -11,6 +11,7 @@
     "build": "tsc -b && vite build && node scripts/generate-service-worker.mjs",
     "check": "tsc -b",
     "test": "vitest run",
+    "test:rules": "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 PATH=/usr/lib/jvm/java-21-openjdk-amd64/bin:$PATH firebase emulators:exec --only firestore --project demo-robamimi-dakoku \"vitest run src/firebase/firestore.rules.test.ts\"",
     "test:watch": "vitest",
     "preview": "vite preview"
   },
@@ -19,6 +20,8 @@
     "idb": "8.0.3"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "5.0.1",
+    "firebase-tools": "15.24.0",
     "typescript": "7.0.2",
     "vite": "8.2.0",
     "vitest": "4.1.10"

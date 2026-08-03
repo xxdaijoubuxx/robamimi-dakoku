@@ -1,0 +1,56 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) {
+      return request.auth != null
+        && request.auth.uid == 'p8H8qiKvh3f1gWgPlowG0mfTHQH2'
+        && request.auth.uid == uid;
+    }
+
+    function isValidRecord(data) {
+      return data.keys().hasAll([
+          'kind',
+          'occurredAt',
+          'timezone',
+          'body',
+          'createdAt',
+          'updatedAt',
+          'revision',
+          'deletedAt',
+          'deviceId'
+        ])
+        && data.keys().hasOnly([
+          'kind',
+          'occurredAt',
+          'timezone',
+          'body',
+          'createdAt',
+          'updatedAt',
+          'revision',
+          'deletedAt',
+          'deviceId'
+        ])
+        && data.kind in ['wake', 'sleep', 'memo']
+        && data.occurredAt is timestamp
+        && data.timezone is string
+        && data.body is string
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp
+        && data.revision is int
+        && data.revision >= 1
+        && (data.deletedAt == null || data.deletedAt is timestamp)
+        && data.deviceId is string;
+    }
+
+    match /users/{uid}/records/{recordId} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && isValidRecord(request.resource.data);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

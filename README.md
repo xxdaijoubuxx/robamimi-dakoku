@@ -13,7 +13,8 @@
 - 設計：合意済み
 - 試作公開：<https://xxdaijoubuxx.github.io/robamimi-dakoku/>
 - Android 16最小試作：Chromeショートカット方式で合格
-- 次の作業：WBS 7.3.5「FirestoreデータベースとSecurity Rulesを作成」
+- Firebase基盤：本人専用Security Rulesの公開とローカル自動試験が完了
+- 次の作業：WBS 7.4.1「端末内データ構造と移行処理を作成」
 
 ## 正本
 
