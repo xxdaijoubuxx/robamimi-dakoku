@@ -1,6 +1,7 @@
 import './style.css'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { firebaseAuth } from './firebase/client'
+import { isOwnerUid } from './firebase/owner'
 import { createPrototypeRecord, deleteAllPrototypeRecords, getPrototypeRecords } from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind, PrototypeRecord } from './prototype/types'
@@ -47,6 +48,7 @@ function formatDateTime(isoDate: string): string {
 async function renderSetup(authMessage = ''): Promise<void> {
   const auth = firebaseAuth()
   const user = auth.currentUser
+  const owner = user ? isOwnerUid(user.uid) : false
 
   app.innerHTML = `
     <section class="shell" aria-labelledby="page-title">
@@ -67,12 +69,15 @@ async function renderSetup(authMessage = ''): Promise<void> {
         <h2 id="auth-title">Firebase本人確認</h2>
         ${authMessage}
         ${
-          user
+          user && owner
             ? `<p class="result-message success">✓ Googleログイン済み</p>
                <p class="help">本人UID（パスワードではありません）</p>
                <code>${escapeHtml(user.uid)}</code>
                <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
-            : '<button class="primary-button" type="button" data-google-sign-in>Googleで本人確認</button>'
+            : user
+              ? `<p class="result-message">このGoogleアカウントは、ろばみみ打刻の本人として登録されていません。</p>
+                 <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
+              : '<button class="primary-button" type="button" data-google-sign-in>Googleで本人確認</button>'
         }
       </section>
     </section>
