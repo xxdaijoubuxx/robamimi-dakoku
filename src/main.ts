@@ -2,6 +2,7 @@ import './style.css'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { firebaseAuth } from './firebase/client'
 import { isOwnerUid } from './firebase/owner'
+import { createMemoAutosave, type MemoSaveState } from './memo/autosave'
 import {
   createPrototypeRecord,
   deleteAllPrototypeRecords,
@@ -10,6 +11,8 @@ import {
 } from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind, PrototypeRecord } from './prototype/types'
+import { updateMemoBody } from './storage/database'
+import type { RecordData } from './storage/types'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -76,6 +79,84 @@ function savedActionMarkup(record: PrototypeRecord, hasRecentSameKind: boolean):
       <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
     </section>
   `
+}
+
+function showMemoSaveState(state: MemoSaveState): void {
+  const status = app.querySelector<HTMLElement>('[data-memo-save-status]')
+  const retry = app.querySelector<HTMLButtonElement>('[data-memo-save-retry]')
+  if (!status || !retry) {
+    return
+  }
+
+  const display = {
+    saved: '✓ 自動保存済み',
+    saving: '… 保存中',
+    failed: '⚠ 未保存',
+  }[state]
+  status.textContent = display
+  status.dataset.state = state
+  retry.hidden = state !== 'failed'
+}
+
+function renderMemo(record: RecordData): void {
+  app.innerHTML = `
+    <section class="shell memo-shell" aria-labelledby="page-title">
+      <header class="memo-header">
+        <h1 id="page-title">メモ</h1>
+        <time datetime="${escapeHtml(record.occurredAt)}">${escapeHtml(formatTime(record.occurredAt))}</time>
+      </header>
+      <label class="visually-hidden" for="memo-body">任意のメモ</label>
+      <textarea id="memo-body" class="memo-input" rows="7" placeholder="任意のメモ" autofocus>${escapeHtml(record.body)}</textarea>
+      <div class="memo-status" aria-live="polite">
+        <p data-memo-save-status data-state="saved">✓ 自動保存済み</p>
+        <p class="sync-pending">↻ 同期待ち</p>
+      </div>
+      <button class="primary-button" type="button" data-memo-save-retry hidden>保存を再試行</button>
+      <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
+    </section>
+  `
+
+  const textarea = app.querySelector<HTMLTextAreaElement>('#memo-body')
+  const retry = app.querySelector<HTMLButtonElement>('[data-memo-save-retry]')
+  if (!textarea || !retry) {
+    throw new Error('メモ入力欄を初期化できません。')
+  }
+
+  const autosave = createMemoAutosave(
+    async (body) => {
+      await updateMemoBody(record.id, body)
+    },
+    showMemoSaveState,
+  )
+  let composing = false
+
+  textarea.addEventListener('compositionstart', () => {
+    composing = true
+  })
+  textarea.addEventListener('compositionend', () => {
+    composing = false
+    autosave.schedule(textarea.value)
+  })
+  textarea.addEventListener('input', () => {
+    if (!composing) {
+      autosave.schedule(textarea.value)
+    }
+  })
+  textarea.addEventListener('blur', () => {
+    void autosave.flush()
+  })
+  retry.addEventListener('click', () => {
+    void autosave.retry()
+  })
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') {
+      void autosave.flush()
+    }
+  })
+  window.addEventListener('pagehide', () => {
+    void autosave.flush()
+  })
+  textarea.focus({ preventScroll: true })
 }
 
 async function renderSetup(authMessage = ''): Promise<void> {
@@ -170,16 +251,7 @@ async function renderAction(kind: EntryKind): Promise<void> {
       app.innerHTML = savedActionMarkup(record, hasRecentSameKind)
       return
     }
-    app.innerHTML = `
-      <section class="shell action-shell ${kind}" aria-labelledby="page-title">
-        <p class="eyebrow">端末内保存</p>
-        <h1 id="page-title">${label}</h1>
-        <p class="result-time">${escapeHtml(formatDateTime(record.occurredAt))}</p>
-        <p class="result-message success" aria-live="polite">✓ 記録しました</p>
-        <p class="help">Firebase同期はまだない最小試作です。</p>
-        <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
-      </section>
-    `
+    renderMemo(record)
   } catch (error) {
     console.error(error)
     app.innerHTML = `

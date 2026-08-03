@@ -147,6 +147,38 @@ export async function hasPreviousRecordWithin(
   })
 }
 
+export async function updateMemoBody(recordId: string, body: string): Promise<RecordData> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'], 'readwrite')
+  const storedRecord = await transaction.objectStore('records').get(recordId)
+  if (!storedRecord || !isCurrentRecord(storedRecord) || storedRecord.kind !== 'memo') {
+    throw new Error('更新するメモが見つかりません。')
+  }
+  if (storedRecord.body === body) {
+    await transaction.done
+    return storedRecord
+  }
+
+  const updatedRecord: RecordData = {
+    ...storedRecord,
+    body,
+    updatedAt: new Date().toISOString(),
+    revision: storedRecord.revision + 1,
+  }
+  const currentSync = await transaction.objectStore('sync').get(recordId)
+  const updatedSync: SyncEntry = {
+    ...(currentSync ?? pendingSyncEntry(recordId)),
+    status: currentSync?.status === 'conflict' ? 'conflict' : 'pending',
+    lastAttemptAt: null,
+    errorCode: null,
+  }
+
+  await transaction.objectStore('records').put(updatedRecord)
+  await transaction.objectStore('sync').put(updatedSync)
+  await transaction.done
+  return updatedRecord
+}
+
 export async function deleteAllPrototypeData(): Promise<void> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync'], 'readwrite')
