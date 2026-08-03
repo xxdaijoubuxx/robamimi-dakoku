@@ -154,6 +154,7 @@ function renderMemo(record: RecordData): void {
   const autosave = createMemoAutosave<string>(
     async (body) => {
       await updateMemoBody(record.id, body)
+      startBackgroundSync()
     },
     showMemoSaveState,
   )
