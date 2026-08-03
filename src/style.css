@@ -373,6 +373,7 @@ h1 {
 }
 
 .history-sync.failed,
+.history-sync.reauth-required,
 .history-sync.conflict {
   color: #a22e28;
 }

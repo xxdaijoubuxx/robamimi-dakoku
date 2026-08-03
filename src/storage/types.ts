@@ -13,7 +13,7 @@ export interface RecordData {
   deviceId: string
 }
 
-export type SyncStatus = 'pending' | 'synced' | 'failed' | 'conflict'
+export type SyncStatus = 'pending' | 'synced' | 'failed' | 'reauth-required' | 'conflict'
 
 export interface SyncEntry {
   recordId: string

@@ -205,6 +205,23 @@ export async function markRecordSynced(uploadedRecord: RecordData): Promise<bool
   return true
 }
 
+export async function markRecordSyncIssue(
+  recordId: string,
+  status: Extract<SyncStatus, 'failed' | 'reauth-required'>,
+  errorCode: string,
+): Promise<void> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction('sync', 'readwrite')
+  const currentSync = await transaction.store.get(recordId)
+  await transaction.store.put({
+    ...(currentSync ?? pendingSyncEntry(recordId)),
+    status,
+    lastAttemptAt: new Date().toISOString(),
+    errorCode,
+  })
+  await transaction.done
+}
+
 export async function getRecordById(recordId: string): Promise<RecordData | null> {
   const database = await readyDatabasePromise
   const record = await database.get('records', recordId)

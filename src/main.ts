@@ -84,7 +84,7 @@ function savedActionMarkup(record: RecordData, hasRecentSameKind: boolean): stri
       <p class="result-time">${escapeHtml(formatTime(record.occurredAt))}</p>
       <div class="save-status" aria-live="polite">
         <p class="result-message success">✓ 端末に保存済み</p>
-        <p class="sync-pending">↻ 同期待ち</p>
+        <p class="sync-pending" data-sync-status>↻ 同期待ち</p>
       </div>
       ${duplicateMessage}
       <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
@@ -93,8 +93,19 @@ function savedActionMarkup(record: RecordData, hasRecentSameKind: boolean): stri
 }
 
 function startNewRecordUpload(record: RecordData): void {
-  void uploadNewRecord(record).catch((error: unknown) => {
-    console.error('Firebaseへの新規記録送信に失敗しました。', error)
+  void uploadNewRecord(record).then((outcome) => {
+    const status = app.querySelector<HTMLElement>('[data-sync-status]')
+    if (!status) return
+    const displays = {
+      synced: '✓ 同期済み',
+      pending: '↻ 同期待ち',
+      failed: '⚠ 同期に失敗',
+      'reauth-required': '⚠ 再ログインが必要',
+    }
+    status.textContent = displays[outcome]
+    status.dataset.state = outcome
+  }).catch((error: unknown) => {
+    console.error('同期状態を端末内へ保存できませんでした。', error)
   })
 }
 
@@ -126,7 +137,7 @@ function renderMemo(record: RecordData): void {
       <textarea id="memo-body" class="memo-input" rows="7" placeholder="任意のメモ" autofocus>${escapeHtml(record.body)}</textarea>
       <div class="memo-status" aria-live="polite">
         <p data-memo-save-status data-state="saved">✓ 自動保存済み</p>
-        <p class="sync-pending">↻ 同期待ち</p>
+        <p class="sync-pending" data-sync-status>↻ 同期待ち</p>
       </div>
       <button class="primary-button" type="button" data-memo-save-retry hidden>保存を再試行</button>
       <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
@@ -321,6 +332,7 @@ function syncStatusMarkup(status: SyncStatus): string {
     synced: null,
     pending: { label: '↻ 同期待ち', className: 'pending' },
     failed: { label: '⚠ 同期失敗', className: 'failed' },
+    'reauth-required': { label: '⚠ 再ログインが必要', className: 'reauth-required' },
     conflict: { label: '⚠ 確認が必要', className: 'conflict' },
   }
   const display = statuses[status]
