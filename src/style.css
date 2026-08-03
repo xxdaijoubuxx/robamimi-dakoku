@@ -135,6 +135,24 @@ h1 {
   text-align: center;
 }
 
+.setup-auth {
+  display: grid;
+  gap: 12px;
+  justify-items: start;
+  padding-top: 12px;
+  border-top: 1px solid #d8cec0;
+}
+
+.setup-auth h2,
+.setup-auth p {
+  margin: 0;
+}
+
+.setup-auth code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+
 .action-shell.wake h1 {
   color: #a56600;
 }

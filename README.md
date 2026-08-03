@@ -13,7 +13,7 @@
 - 設計：合意済み
 - 試作公開：<https://xxdaijoubuxx.github.io/robamimi-dakoku/>
 - Android 16最小試作：Chromeショートカット方式で合格
-- 次の作業：WBS 7.3.2「WebアプリとGitHub Pagesの公開ドメインを登録」
+- 次の作業：WBS 7.3.4「本人UIDを確認し、本人だけを許可する方針を設定」
 
 ## 正本
 

@@ -1,4 +1,6 @@
 import './style.css'
+import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
+import { firebaseAuth } from './firebase/client'
 import { createPrototypeRecord, deleteAllPrototypeRecords, getPrototypeRecords } from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind, PrototypeRecord } from './prototype/types'
@@ -42,7 +44,10 @@ function formatDateTime(isoDate: string): string {
   }).format(new Date(isoDate))
 }
 
-function renderSetup(): void {
+async function renderSetup(authMessage = ''): Promise<void> {
+  const auth = firebaseAuth()
+  const user = auth.currentUser
+
   app.innerHTML = `
     <section class="shell" aria-labelledby="page-title">
       <p class="eyebrow">最小試作</p>
@@ -58,8 +63,34 @@ function renderSetup(): void {
         <a class="entry history" href="${BASE_URL}history/">履歴を見る</a>
       </nav>
       <p class="help">「準備」ページでは記録されません。Chromeから各ページをホーム画面へ追加します。</p>
+      <section class="setup-auth" aria-labelledby="auth-title">
+        <h2 id="auth-title">Firebase本人確認</h2>
+        ${authMessage}
+        ${
+          user
+            ? `<p class="result-message success">✓ Googleログイン済み</p>
+               <p class="help">本人UID（パスワードではありません）</p>
+               <code>${escapeHtml(user.uid)}</code>
+               <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
+            : '<button class="primary-button" type="button" data-google-sign-in>Googleで本人確認</button>'
+        }
+      </section>
     </section>
   `
+
+  app.querySelector<HTMLButtonElement>('[data-google-sign-in]')?.addEventListener('click', async () => {
+    try {
+      await signInWithPopup(auth, new GoogleAuthProvider())
+      await renderSetup()
+    } catch (error) {
+      console.error(error)
+      await renderSetup('<p class="result-message">Googleログインを完了できませんでした。もう一度お試しください。</p>')
+    }
+  })
+  app.querySelector<HTMLButtonElement>('[data-sign-out]')?.addEventListener('click', async () => {
+    await signOut(auth)
+    await renderSetup()
+  })
 }
 
 function renderInstallPreview(kind: EntryKind): void {
@@ -180,7 +211,7 @@ async function start(): Promise<void> {
   const entry = document.body.dataset.entry
 
   if (entry === 'setup') {
-    renderSetup()
+    await renderSetup()
     return
   }
   if (entry === 'history') {
