@@ -1,0 +1,16 @@
+{
+  "id": "/robamimi-dakoku/sleep",
+  "name": "ろばみみ打刻 就寝",
+  "short_name": "就寝",
+  "description": "就寝時刻を一回で端末内へ記録します。",
+  "start_url": "/robamimi-dakoku/sleep/",
+  "scope": "/robamimi-dakoku/",
+  "display": "standalone",
+  "background_color": "#211e1b",
+  "theme_color": "#596a9d",
+  "launch_handler": { "client_mode": "navigate-new" },
+  "icons": [
+    { "src": "../icons/sleep-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "../icons/sleep-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

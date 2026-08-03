@@ -1,0 +1,280 @@
+:root {
+  color: #2d2925;
+  background: #f6f1e8;
+  font-family:
+    system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+}
+
+body,
+#app {
+  min-height: 100vh;
+}
+
+#app {
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+
+.shell {
+  width: min(100%, 440px);
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: #785f43;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+h1 {
+  margin: 0;
+  font-size: clamp(2rem, 10vw, 3rem);
+  line-height: 1.1;
+}
+
+.description {
+  margin: 20px 0 28px;
+  color: #625a52;
+  line-height: 1.8;
+}
+
+.status-card {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin: 0;
+  border: 1px solid #d8cec0;
+  border-radius: 16px;
+  background: #d8cec0;
+}
+
+.status-card div {
+  display: grid;
+  grid-template-columns: 6rem 1fr;
+  gap: 16px;
+  padding: 16px;
+  background: #fffdf9;
+}
+
+.status-card dt {
+  color: #785f43;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.status-card dd {
+  margin: 0;
+}
+
+.entry-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.entry,
+.primary-button,
+.danger-button,
+.secondary-link {
+  border: 0;
+  border-radius: 14px;
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.entry {
+  display: grid;
+  min-height: 88px;
+  place-items: center;
+  padding: 14px;
+  color: #241f1a;
+  text-align: center;
+}
+
+.entry.wake {
+  background: #f2c56d;
+}
+
+.entry.sleep {
+  color: #fff;
+  background: #6575a6;
+}
+
+.entry.memo {
+  background: #91b397;
+}
+
+.entry.history {
+  color: #fff;
+  background: #8d7461;
+}
+
+.help,
+.empty-message {
+  color: #71675e;
+  font-size: 0.9rem;
+  line-height: 1.7;
+}
+
+.action-shell {
+  text-align: center;
+}
+
+.action-shell.wake h1 {
+  color: #a56600;
+}
+
+.action-shell.sleep h1 {
+  color: #596a9d;
+}
+
+.action-shell.memo h1 {
+  color: #52795a;
+}
+
+.result-time {
+  margin: 32px 0 20px;
+  font-size: clamp(1.45rem, 7vw, 2rem);
+  font-variant-numeric: tabular-nums;
+}
+
+.result-message {
+  margin: 18px 0;
+  line-height: 1.7;
+}
+
+.result-message.success {
+  color: #306c3b;
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+
+.secondary-link,
+.primary-button,
+.danger-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+.secondary-link,
+.primary-button {
+  color: #fff;
+  background: #59493c;
+}
+
+.danger-button {
+  color: #8c231e;
+  background: #f5d5d1;
+}
+
+.record-list {
+  display: grid;
+  gap: 1px;
+  overflow: hidden;
+  margin: 24px 0;
+  padding: 0;
+  border: 1px solid #d8cec0;
+  border-radius: 16px;
+  background: #d8cec0;
+  list-style: none;
+}
+
+.record-item {
+  display: grid;
+  grid-template-columns: 4rem 1fr;
+  gap: 4px 12px;
+  padding: 14px 16px;
+  background: #fffdf9;
+}
+
+.record-item time {
+  font-variant-numeric: tabular-nums;
+}
+
+.record-item code {
+  grid-column: 2;
+  color: #887d73;
+  font-size: 0.75rem;
+}
+
+.history-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color: #f4eee6;
+    background: #211e1b;
+  }
+
+  .eyebrow,
+  .status-card dt {
+    color: #d6b78f;
+  }
+
+  .description {
+    color: #c9bfb5;
+  }
+
+  .help,
+  .empty-message {
+    color: #b9afa5;
+  }
+
+  .action-shell.wake h1 {
+    color: #f2c56d;
+  }
+
+  .action-shell.sleep h1 {
+    color: #aebbea;
+  }
+
+  .action-shell.memo h1 {
+    color: #a9cfaf;
+  }
+
+  .result-message.success {
+    color: #a9cfaf;
+  }
+
+  .status-card {
+    border-color: #51483f;
+    background: #51483f;
+  }
+
+  .status-card div {
+    background: #2c2824;
+  }
+
+  .record-list {
+    border-color: #51483f;
+    background: #51483f;
+  }
+
+  .record-item {
+    background: #2c2824;
+  }
+}

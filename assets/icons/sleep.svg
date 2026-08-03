@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#596a9d"/>
+  <path d="M332 82c-82 30-126 121-96 203 24 66 88 106 155 102-30 35-74 57-124 57-91 0-165-74-165-165 0-96 82-173 178-164 18 2 36 6 52 13z" fill="#eef0ff"/>
+  <text x="256" y="410" text-anchor="middle" font-family="sans-serif" font-size="96" font-weight="700" fill="#ffffff">寝</text>
+</svg>
