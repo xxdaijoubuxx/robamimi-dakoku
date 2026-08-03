@@ -6,7 +6,7 @@ import {
   localDateTimeToIso,
   type RecordDraft,
 } from './history/editor'
-import { groupHistoryEntries, historyTimeLabel } from './history/view'
+import { groupHistoryEntries, historyDateLabel, historyTimeLabel } from './history/view'
 import { isOwnerUid } from './firebase/owner'
 import { createMemoAutosave, type MemoSaveState } from './memo/autosave'
 import {
@@ -17,7 +17,10 @@ import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
   getHistoryEntries,
+  getRecentlyDeletedRecords,
   getRecordById,
+  restoreRecord,
+  softDeleteRecord,
   updateMemoBody,
   updateRecord,
   type RecordChanges,
@@ -368,7 +371,10 @@ async function renderRecordEditor(recordId: string): Promise<void> {
         <p class="sync-pending">↻ 同期待ち</p>
       </div>
       <button class="primary-button" type="button" data-editor-save-retry hidden>保存を再試行</button>
-      <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+      <div class="editor-actions">
+        <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+        <button class="danger-button" type="button" data-delete-record>この記録を削除</button>
+      </div>
     </section>
   `
 
@@ -377,7 +383,8 @@ async function renderRecordEditor(recordId: string): Promise<void> {
   const bodyInput = app.querySelector<HTMLTextAreaElement>('#record-body')
   const bodyField = app.querySelector<HTMLElement>('[data-editor-body-field]')
   const retry = app.querySelector<HTMLButtonElement>('[data-editor-save-retry]')
-  if (!kindInput || !dateTimeInput || !bodyInput || !bodyField || !retry) {
+  const deleteButton = app.querySelector<HTMLButtonElement>('[data-delete-record]')
+  if (!kindInput || !dateTimeInput || !bodyInput || !bodyField || !retry || !deleteButton) {
     throw new Error('編集画面を初期化できません。')
   }
 
@@ -393,18 +400,17 @@ async function renderRecordEditor(recordId: string): Promise<void> {
     }
   }
 
-  const autosave = createMemoAutosave<RecordDraft>(
-    async (draft: RecordDraft) => {
-      const changes: RecordChanges = { kind: draft.kind, body: draft.body }
-      if (draft.localDateTime !== lastSavedDraft.localDateTime) {
-        changes.occurredAt = localDateTimeToIso(draft.localDateTime)
-        changes.timezone = currentTimezone()
-      }
-      const updatedRecord = await updateRecord(record.id, changes)
-      lastSavedDraft = draftFromRecord(updatedRecord)
-    },
-    showEditorSaveState,
-  )
+  async function persistDraft(draft: RecordDraft): Promise<void> {
+    const changes: RecordChanges = { kind: draft.kind, body: draft.body }
+    if (draft.localDateTime !== lastSavedDraft.localDateTime) {
+      changes.occurredAt = localDateTimeToIso(draft.localDateTime)
+      changes.timezone = currentTimezone()
+    }
+    const updatedRecord = await updateRecord(recordId, changes)
+    lastSavedDraft = draftFromRecord(updatedRecord)
+  }
+
+  const autosave = createMemoAutosave<RecordDraft>(persistDraft, showEditorSaveState)
   let composing = false
 
   kindInput.addEventListener('change', () => {
@@ -444,6 +450,23 @@ async function renderRecordEditor(recordId: string): Promise<void> {
   retry.addEventListener('click', () => {
     void autosave.retry()
   })
+  deleteButton.addEventListener('click', async () => {
+    const confirmed = window.confirm('この記録を削除しますか？30日以内なら復元できます。')
+    if (!confirmed) {
+      return
+    }
+    deleteButton.disabled = true
+    try {
+      await autosave.flush()
+      await persistDraft(readDraft())
+      await softDeleteRecord(recordId)
+      window.location.assign(`${BASE_URL}history/`)
+    } catch (error) {
+      console.error(error)
+      deleteButton.disabled = false
+      window.alert('端末内の保存に失敗したため、削除しませんでした。')
+    }
+  })
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'hidden') {
       void autosave.flush()
@@ -452,6 +475,60 @@ async function renderRecordEditor(recordId: string): Promise<void> {
   window.addEventListener('pagehide', () => {
     void autosave.flush()
   })
+}
+
+function deletedRecordMarkup(record: RecordData): string {
+  const body = record.kind === 'memo' && record.body !== ''
+    ? `<p class="history-body">${escapeHtml(record.body)}</p>`
+    : ''
+  return `
+    <article class="deleted-record">
+      <div class="deleted-record-main">
+        <time datetime="${escapeHtml(record.occurredAt)}">
+          ${escapeHtml(historyDateLabel(record.occurredAt, record.timezone))}
+          ${escapeHtml(historyTimeLabel(record.occurredAt, record.timezone))}
+        </time>
+        <strong class="history-kind ${record.kind}">${escapeHtml(labelFor(record.kind))}</strong>
+        ${body}
+      </div>
+      <button class="primary-button" type="button" data-restore-record="${escapeHtml(record.id)}">復元</button>
+    </article>
+  `
+}
+
+async function renderRecentlyDeleted(): Promise<void> {
+  const records = await getRecentlyDeletedRecords()
+  app.innerHTML = `
+    <section class="shell deleted-shell" aria-labelledby="page-title">
+      <p class="eyebrow">30日以内</p>
+      <h1 id="page-title">最近削除した記録</h1>
+      <p class="description">復元すると通常の履歴に戻り、同期待ちになります。</p>
+      ${
+        records.length > 0
+          ? `<div class="deleted-records">${records.map(deletedRecordMarkup).join('')}</div>`
+          : '<p class="empty-message">復元できる記録はありません。</p>'
+      }
+      <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+    </section>
+  `
+
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-restore-record]')) {
+    button.addEventListener('click', async () => {
+      const recordId = button.dataset.restoreRecord
+      if (!recordId) {
+        return
+      }
+      button.disabled = true
+      try {
+        await restoreRecord(recordId)
+        await renderRecentlyDeleted()
+      } catch (error) {
+        console.error(error)
+        button.disabled = false
+        window.alert('記録を復元できませんでした。')
+      }
+    })
+  }
 }
 
 async function renderHistory(): Promise<void> {
@@ -477,6 +554,7 @@ async function renderHistory(): Promise<void> {
       }
       <div class="history-actions">
         <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
+        <a class="text-link" href="${BASE_URL}history/?deleted=1">最近削除した記録</a>
       </div>
     </section>
   `
@@ -498,8 +576,11 @@ async function start(): Promise<void> {
     return
   }
   if (entry === 'history') {
-    const recordId = new URLSearchParams(window.location.search).get('record')
-    if (recordId) {
+    const parameters = new URLSearchParams(window.location.search)
+    const recordId = parameters.get('record')
+    if (parameters.get('deleted') === '1') {
+      await renderRecentlyDeleted()
+    } else if (recordId) {
       await renderRecordEditor(recordId)
     } else {
       await renderHistory()

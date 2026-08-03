@@ -466,6 +466,56 @@ h1 {
   justify-content: space-between;
 }
 
+.text-link {
+  color: #59493c;
+  font-weight: 700;
+  text-underline-offset: 3px;
+}
+
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid #d8cec0;
+}
+
+.deleted-shell,
+.deleted-records {
+  display: grid;
+  gap: 18px;
+}
+
+.deleted-records {
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid #d8cec0;
+  border-radius: 16px;
+  background: #d8cec0;
+}
+
+.deleted-record {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  padding: 14px 16px;
+  background: #fffdf9;
+}
+
+.deleted-record-main {
+  display: grid;
+  grid-template-columns: minmax(8rem, 1fr) auto;
+  gap: 6px 12px;
+  align-items: baseline;
+}
+
+.deleted-record-main .history-body {
+  grid-column: 1 / -1;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     color: #f4eee6;
@@ -491,12 +541,29 @@ h1 {
     color: #c9bfb5;
   }
 
+  .text-link {
+    color: #e0c9ad;
+  }
+
   .history-day-records {
     border-color: #51483f;
     background: #51483f;
   }
 
   .history-record {
+    background: #2b2723;
+  }
+
+  .editor-actions {
+    border-color: #51483f;
+  }
+
+  .deleted-records {
+    border-color: #51483f;
+    background: #51483f;
+  }
+
+  .deleted-record {
     background: #2b2723;
   }
 

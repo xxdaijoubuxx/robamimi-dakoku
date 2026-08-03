@@ -1,5 +1,6 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { createInitialSettings, DATA_VERSION, migratePrototypeRecord } from './migrations'
+import { isWithinRestoreWindow } from './retention'
 import type {
   AppSettings,
   DiagnosticLog,
@@ -163,6 +164,15 @@ export async function getRecordById(recordId: string): Promise<RecordData | null
   return record && isCurrentRecord(record) && record.deletedAt === null ? record : null
 }
 
+export async function getRecentlyDeletedRecords(nowMilliseconds = Date.now()): Promise<RecordData[]> {
+  const database = await readyDatabasePromise
+  const records = await database.getAll('records')
+  return records
+    .filter(isCurrentRecord)
+    .filter((record) => isWithinRestoreWindow(record.deletedAt, nowMilliseconds))
+    .sort((left, right) => (right.deletedAt ?? '').localeCompare(left.deletedAt ?? ''))
+}
+
 export async function hasPreviousRecordWithin(
   record: RecordData,
   intervalMilliseconds: number,
@@ -229,6 +239,51 @@ export async function updateRecord(recordId: string, changes: RecordChanges): Pr
 
 export async function updateMemoBody(recordId: string, body: string): Promise<RecordData> {
   return updateRecord(recordId, { body })
+}
+
+async function changeDeletedAt(recordId: string, deletedAt: string | null): Promise<RecordData> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'], 'readwrite')
+  const storedRecord = await transaction.objectStore('records').get(recordId)
+  if (!storedRecord || !isCurrentRecord(storedRecord)) {
+    throw new Error('対象の記録が見つかりません。')
+  }
+
+  const updatedRecord: RecordData = {
+    ...storedRecord,
+    deletedAt,
+    updatedAt: new Date().toISOString(),
+    revision: storedRecord.revision + 1,
+  }
+  const currentSync = await transaction.objectStore('sync').get(recordId)
+  const updatedSync: SyncEntry = {
+    ...(currentSync ?? pendingSyncEntry(recordId)),
+    status: currentSync?.status === 'conflict' ? 'conflict' : 'pending',
+    lastAttemptAt: null,
+    errorCode: null,
+  }
+
+  await transaction.objectStore('records').put(updatedRecord)
+  await transaction.objectStore('sync').put(updatedSync)
+  await transaction.done
+  return updatedRecord
+}
+
+export async function softDeleteRecord(recordId: string): Promise<RecordData> {
+  const record = await getRecordById(recordId)
+  if (!record) {
+    throw new Error('削除する記録が見つかりません。')
+  }
+  return changeDeletedAt(recordId, new Date().toISOString())
+}
+
+export async function restoreRecord(recordId: string): Promise<RecordData> {
+  const database = await readyDatabasePromise
+  const storedRecord = await database.get('records', recordId)
+  if (!storedRecord || !isCurrentRecord(storedRecord) || !isWithinRestoreWindow(storedRecord.deletedAt)) {
+    throw new Error('この記録は復元できません。')
+  }
+  return changeDeletedAt(recordId, null)
 }
 
 export async function deleteAllPrototypeData(): Promise<void> {
