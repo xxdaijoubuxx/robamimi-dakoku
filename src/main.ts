@@ -29,6 +29,7 @@ import {
   type RecordChanges,
 } from './storage/database'
 import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
+import { uploadNewRecord } from './sync/upload'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -89,6 +90,12 @@ function savedActionMarkup(record: RecordData, hasRecentSameKind: boolean): stri
       <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
     </section>
   `
+}
+
+function startNewRecordUpload(record: RecordData): void {
+  void uploadNewRecord(record).catch((error: unknown) => {
+    console.error('Firebaseへの新規記録送信に失敗しました。', error)
+  })
 }
 
 function showMemoSaveState(state: MemoSaveState): void {
@@ -275,9 +282,11 @@ async function renderAction(kind: EntryKind): Promise<void> {
         console.error('連続打刻の確認に失敗しました。', error)
       }
       app.innerHTML = savedActionMarkup(record, hasRecentSameKind)
+      startNewRecordUpload(record)
       return
     }
     renderMemo(record)
+    startNewRecordUpload(record)
   } catch (error) {
     console.error(error)
     app.innerHTML = `

@@ -176,6 +176,35 @@ export async function getHistoryEntries(): Promise<HistoryEntry[]> {
     }))
 }
 
+export async function markRecordSynced(uploadedRecord: RecordData): Promise<boolean> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync', 'settings'], 'readwrite')
+  const currentRecord = await transaction.objectStore('records').get(uploadedRecord.id)
+  const currentSync = await transaction.objectStore('sync').get(uploadedRecord.id)
+
+  if (!currentRecord || !isCurrentRecord(currentRecord) || currentRecord.revision !== uploadedRecord.revision) {
+    await transaction.done
+    return false
+  }
+
+  const syncedAt = new Date().toISOString()
+  await transaction.objectStore('sync').put({
+    ...(currentSync ?? pendingSyncEntry(uploadedRecord.id)),
+    status: 'synced',
+    syncedRevision: uploadedRecord.revision,
+    lastAttemptAt: syncedAt,
+    errorCode: null,
+    syncedRecord: uploadedRecord,
+    remoteRecord: null,
+  })
+  const settings = await transaction.objectStore('settings').get('main')
+  if (settings) {
+    await transaction.objectStore('settings').put({ ...settings, lastSyncAt: syncedAt })
+  }
+  await transaction.done
+  return true
+}
+
 export async function getRecordById(recordId: string): Promise<RecordData | null> {
   const database = await readyDatabasePromise
   const record = await database.get('records', recordId)
