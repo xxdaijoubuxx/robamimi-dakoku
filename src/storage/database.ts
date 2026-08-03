@@ -131,6 +131,22 @@ export async function getRecordsNewestFirst(): Promise<RecordData[]> {
   return records.filter(isCurrentRecord).reverse()
 }
 
+export async function hasPreviousRecordWithin(
+  record: RecordData,
+  intervalMilliseconds: number,
+): Promise<boolean> {
+  const records = await getRecordsNewestFirst()
+  const occurredAt = new Date(record.occurredAt).getTime()
+
+  return records.some((candidate) => {
+    if (candidate.id === record.id || candidate.kind !== record.kind || candidate.deletedAt !== null) {
+      return false
+    }
+    const difference = occurredAt - new Date(candidate.occurredAt).getTime()
+    return difference >= 0 && difference <= intervalMilliseconds
+  })
+}
+
 export async function deleteAllPrototypeData(): Promise<void> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync'], 'readwrite')

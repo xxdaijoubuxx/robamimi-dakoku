@@ -2,7 +2,12 @@ import './style.css'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { firebaseAuth } from './firebase/client'
 import { isOwnerUid } from './firebase/owner'
-import { createPrototypeRecord, deleteAllPrototypeRecords, getPrototypeRecords } from './prototype/database'
+import {
+  createPrototypeRecord,
+  deleteAllPrototypeRecords,
+  getPrototypeRecords,
+  hasPreviousRecordWithin,
+} from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind, PrototypeRecord } from './prototype/types'
 
@@ -43,6 +48,34 @@ function formatDateTime(isoDate: string): string {
     minute: '2-digit',
     second: '2-digit',
   }).format(new Date(isoDate))
+}
+
+function formatTime(isoDate: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(isoDate))
+}
+
+function savedActionMarkup(record: PrototypeRecord, hasRecentSameKind: boolean): string {
+  const label = labelFor(record.kind)
+  const duplicateMessage = hasRecentSameKind
+    ? `<p class="duplicate-notice">直前にも${escapeHtml(label)}があります。</p>`
+    : ''
+
+  return `
+    <section class="shell action-shell ${record.kind}" aria-labelledby="page-title">
+      <p class="eyebrow">打刻完了</p>
+      <h1 id="page-title">${escapeHtml(label)}</h1>
+      <p class="result-time">${escapeHtml(formatTime(record.occurredAt))}</p>
+      <div class="save-status" aria-live="polite">
+        <p class="result-message success">✓ 端末に保存済み</p>
+        <p class="sync-pending">↻ 同期待ち</p>
+      </div>
+      ${duplicateMessage}
+      <a class="secondary-link" href="${BASE_URL}history/">履歴を確認</a>
+    </section>
+  `
 }
 
 async function renderSetup(authMessage = ''): Promise<void> {
@@ -127,6 +160,16 @@ async function renderAction(kind: EntryKind): Promise<void> {
   try {
     const record = await createPrototypeRecord(kind)
     window.history.replaceState(null, '', completedLaunchUrl(BASE_URL, kind))
+    if (kind === 'wake' || kind === 'sleep') {
+      let hasRecentSameKind = false
+      try {
+        hasRecentSameKind = await hasPreviousRecordWithin(record, 5 * 60 * 1000)
+      } catch (error) {
+        console.error('連続打刻の確認に失敗しました。', error)
+      }
+      app.innerHTML = savedActionMarkup(record, hasRecentSameKind)
+      return
+    }
     app.innerHTML = `
       <section class="shell action-shell ${kind}" aria-labelledby="page-title">
         <p class="eyebrow">端末内保存</p>

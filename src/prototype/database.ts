@@ -1,4 +1,9 @@
-import { createRecord, deleteAllPrototypeData, getRecordsNewestFirst } from '../storage/database'
+import {
+  createRecord,
+  deleteAllPrototypeData,
+  getRecordsNewestFirst,
+  hasPreviousRecordWithin,
+} from '../storage/database'
 import type { EntryKind, PrototypeRecord } from './types'
 import type { RecordData } from '../storage/types'
 
@@ -13,5 +18,7 @@ export async function getPrototypeRecords(): Promise<RecordData[]> {
 export async function deleteAllPrototypeRecords(): Promise<void> {
   return deleteAllPrototypeData()
 }
+
+export { hasPreviousRecordWithin }
 
 export type { PrototypeRecord }
