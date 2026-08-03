@@ -1,6 +1,14 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb'
 import { createInitialSettings, DATA_VERSION, migratePrototypeRecord } from './migrations'
-import type { AppSettings, DiagnosticLog, EntryKind, RecordData, SyncEntry, SyncStatus } from './types'
+import type {
+  AppSettings,
+  DiagnosticLog,
+  EntryKind,
+  HistoryEntry,
+  RecordData,
+  SyncEntry,
+  SyncStatus,
+} from './types'
 import type { PrototypeRecord } from '../prototype/types'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
@@ -129,6 +137,24 @@ export async function getRecordsNewestFirst(): Promise<RecordData[]> {
   const database = await readyDatabasePromise
   const records = await database.getAllFromIndex('records', 'by-occurred-at')
   return records.filter(isCurrentRecord).reverse()
+}
+
+export async function getHistoryEntries(): Promise<HistoryEntry[]> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'])
+  const records = await transaction.objectStore('records').index('by-occurred-at').getAll()
+  const syncEntries = await transaction.objectStore('sync').getAll()
+  await transaction.done
+
+  const syncByRecordId = new Map(syncEntries.map((entry) => [entry.recordId, entry.status]))
+  return records
+    .filter(isCurrentRecord)
+    .filter((record) => record.deletedAt === null)
+    .reverse()
+    .map((record) => ({
+      record,
+      syncStatus: syncByRecordId.get(record.id) ?? 'pending',
+    }))
 }
 
 export async function hasPreviousRecordWithin(

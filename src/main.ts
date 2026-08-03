@@ -1,18 +1,17 @@
 import './style.css'
 import { GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth'
 import { firebaseAuth } from './firebase/client'
+import { groupHistoryEntries, historyTimeLabel } from './history/view'
 import { isOwnerUid } from './firebase/owner'
 import { createMemoAutosave, type MemoSaveState } from './memo/autosave'
 import {
   createPrototypeRecord,
-  deleteAllPrototypeRecords,
-  getPrototypeRecords,
   hasPreviousRecordWithin,
 } from './prototype/database'
 import { completedLaunchUrl, launchMode } from './prototype/launch'
-import type { EntryKind, PrototypeRecord } from './prototype/types'
-import { updateMemoBody } from './storage/database'
-import type { RecordData } from './storage/types'
+import type { EntryKind } from './prototype/types'
+import { getHistoryEntries, updateMemoBody } from './storage/database'
+import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -43,16 +42,6 @@ function labelFor(kind: EntryKind): string {
   return { wake: '起床', sleep: '就寝', memo: 'メモ' }[kind]
 }
 
-function formatDateTime(isoDate: string): string {
-  return new Intl.DateTimeFormat('ja-JP', {
-    month: 'long',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date(isoDate))
-}
-
 function formatTime(isoDate: string): string {
   return new Intl.DateTimeFormat('ja-JP', {
     hour: '2-digit',
@@ -60,7 +49,7 @@ function formatTime(isoDate: string): string {
   }).format(new Date(isoDate))
 }
 
-function savedActionMarkup(record: PrototypeRecord, hasRecentSameKind: boolean): string {
+function savedActionMarkup(record: RecordData, hasRecentSameKind: boolean): string {
   const label = labelFor(record.kind)
   const duplicateMessage = hasRecentSameKind
     ? `<p class="duplicate-notice">直前にも${escapeHtml(label)}があります。</p>`
@@ -281,42 +270,61 @@ function renderCompletedReload(kind: EntryKind): void {
   `
 }
 
-function recordItem(record: PrototypeRecord): string {
+function syncStatusMarkup(status: SyncStatus): string {
+  const statuses: Record<SyncStatus, { label: string; className: string } | null> = {
+    synced: null,
+    pending: { label: '↻ 同期待ち', className: 'pending' },
+    failed: { label: '⚠ 同期失敗', className: 'failed' },
+    conflict: { label: '⚠ 確認が必要', className: 'conflict' },
+  }
+  const display = statuses[status]
+  return display
+    ? `<span class="history-sync ${display.className}">${escapeHtml(display.label)}</span>`
+    : ''
+}
+
+function historyRecordMarkup(entry: HistoryEntry): string {
+  const { record, syncStatus } = entry
+  const body = record.kind === 'memo' && record.body !== ''
+    ? `<p class="history-body">${escapeHtml(record.body)}</p>`
+    : ''
+
   return `
-    <li class="record-item">
-      <strong>${escapeHtml(labelFor(record.kind))}</strong>
-      <time datetime="${escapeHtml(record.occurredAt)}">${escapeHtml(formatDateTime(record.occurredAt))}</time>
-      <code>${escapeHtml(record.id.slice(0, 8))}</code>
-    </li>
+    <article class="history-record" data-record-id="${escapeHtml(record.id)}">
+      <time datetime="${escapeHtml(record.occurredAt)}">${escapeHtml(historyTimeLabel(record.occurredAt, record.timezone))}</time>
+      <strong class="history-kind ${record.kind}">${escapeHtml(labelFor(record.kind))}</strong>
+      ${syncStatusMarkup(syncStatus)}
+      ${body}
+    </article>
   `
 }
 
 async function renderHistory(): Promise<void> {
-  const records = await getPrototypeRecords()
+  const entries = await getHistoryEntries()
+  const groups = groupHistoryEntries(entries)
   app.innerHTML = `
-    <section class="shell" aria-labelledby="page-title">
-      <p class="eyebrow">端末内データ</p>
+    <section class="shell history-shell" aria-labelledby="page-title">
+      <p class="eyebrow">端末内の記録</p>
       <h1 id="page-title">履歴</h1>
-      <p class="description">Firebaseへは送られていない試作記録です。</p>
       ${
-        records.length > 0
-          ? `<ol class="record-list">${records.map(recordItem).join('')}</ol>`
+        groups.length > 0
+          ? `<div class="history-groups">${groups
+              .map(
+                (group) => `
+                  <section class="history-day" aria-labelledby="history-day-${escapeHtml(group.key)}">
+                    <h2 id="history-day-${escapeHtml(group.key)}">${escapeHtml(group.label)}</h2>
+                    <div class="history-day-records">${group.entries.map(historyRecordMarkup).join('')}</div>
+                  </section>
+                `,
+              )
+              .join('')}</div>`
           : '<p class="empty-message">まだ記録がありません。</p>'
       }
       <div class="history-actions">
         <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
-        ${records.length > 0 ? '<button class="danger-button" type="button" data-delete-all>試作記録を全削除</button>' : ''}
       </div>
     </section>
   `
-
-  app.querySelector<HTMLButtonElement>('[data-delete-all]')?.addEventListener('click', async () => {
-    if (!window.confirm('Firebase未同期の試作記録をすべて削除しますか？')) {
-      return
-    }
-    await deleteAllPrototypeRecords()
-    await renderHistory()
-  })
 }
 
 async function registerServiceWorker(): Promise<void> {

@@ -25,6 +25,11 @@ export interface SyncEntry {
   remoteRecord: RecordData | null
 }
 
+export interface HistoryEntry {
+  record: RecordData
+  syncStatus: SyncStatus
+}
+
 export type SetupStage = 'not-started' | 'authenticated' | 'offline-ready' | 'complete'
 
 export interface AppSettings {

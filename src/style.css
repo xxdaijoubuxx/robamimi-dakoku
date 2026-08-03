@@ -302,34 +302,84 @@ h1 {
   background: #f5d5d1;
 }
 
-.record-list {
+.history-groups,
+.history-day,
+.history-day-records {
   display: grid;
+  gap: 12px;
+}
+
+.history-groups {
+  gap: 26px;
+  margin: 24px 0;
+}
+
+.history-day h2 {
+  margin: 0;
+  color: #71675e;
+  font-size: 1rem;
+}
+
+.history-day-records {
   gap: 1px;
   overflow: hidden;
-  margin: 24px 0;
-  padding: 0;
   border: 1px solid #d8cec0;
   border-radius: 16px;
   background: #d8cec0;
-  list-style: none;
 }
 
-.record-item {
+.history-record {
   display: grid;
-  grid-template-columns: 4rem 1fr;
-  gap: 4px 12px;
+  grid-template-columns: 4.25rem minmax(4rem, auto) 1fr;
+  gap: 6px 10px;
+  align-items: baseline;
   padding: 14px 16px;
   background: #fffdf9;
 }
 
-.record-item time {
+.history-record time {
   font-variant-numeric: tabular-nums;
+  font-weight: 700;
 }
 
-.record-item code {
-  grid-column: 2;
-  color: #887d73;
-  font-size: 0.75rem;
+.history-kind.wake {
+  color: #a56600;
+}
+
+.history-kind.sleep {
+  color: #596a9d;
+}
+
+.history-kind.memo {
+  color: #52795a;
+}
+
+.history-sync {
+  justify-self: end;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.history-sync.pending {
+  color: #846019;
+}
+
+.history-sync.failed,
+.history-sync.conflict {
+  color: #a22e28;
+}
+
+.history-body {
+  display: -webkit-box;
+  grid-column: 2 / -1;
+  overflow: hidden;
+  margin: 0;
+  color: #554c44;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
 }
 
 .history-actions {
@@ -358,6 +408,32 @@ h1 {
   .help,
   .empty-message {
     color: #b9afa5;
+  }
+
+  .history-day h2,
+  .history-body {
+    color: #c9bfb5;
+  }
+
+  .history-day-records {
+    border-color: #51483f;
+    background: #51483f;
+  }
+
+  .history-record {
+    background: #2b2723;
+  }
+
+  .history-kind.wake {
+    color: #f2c56d;
+  }
+
+  .history-kind.sleep {
+    color: #aebbea;
+  }
+
+  .history-kind.memo {
+    color: #a9cfaf;
   }
 
   .action-shell.wake h1 {
