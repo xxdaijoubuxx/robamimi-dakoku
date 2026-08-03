@@ -204,38 +204,47 @@ async function renderSetup(authMessage = ''): Promise<void> {
       console.error('初回ログイン後のFirebase取得に失敗しました。', error)
     }
   }
+  const settings = await getAppSettings()
+  const trustedDevice = isDailyUseConfigured(settings)
 
   app.innerHTML = `
-    <section class="shell" aria-labelledby="page-title">
-      <p class="eyebrow">初回設定</p>
+    <section class="shell setup-shell" aria-labelledby="page-title">
+      <p class="eyebrow">${trustedDevice ? '設定済み端末' : '初回設定'}</p>
       <h1 id="page-title">ろばみみ打刻</h1>
       <p class="description">
-        最初にGoogleで本人確認します。確認済みのこの端末では、圏外でも端末内へ記録できます。
+        起床・就寝・メモをまずこの端末へ保存し、オンライン時に本人専用のFirebaseへ同期します。
+        最初の一度だけ、Googleで本人確認します。
       </p>
-      <nav class="entry-grid" aria-label="ホーム画面入口の準備">
-        <a class="entry wake" href="${BASE_URL}wake/?install=1">起床を準備</a>
-        <a class="entry sleep" href="${BASE_URL}sleep/?install=1">就寝を準備</a>
-        <a class="entry memo" href="${BASE_URL}memo/?install=1">メモを準備</a>
-        <a class="entry history" href="${BASE_URL}history/">履歴を見る</a>
-      </nav>
-      <p class="help">「準備」ページでは記録されません。Chromeから各ページをホーム画面へ追加します。</p>
+      <ol class="setup-steps" aria-label="初回設定の進み具合">
+        <li class="complete"><strong>使い方を確認</strong><span>端末保存を先に行い、圏外でも打刻します。</span></li>
+        <li class="${trustedDevice ? 'complete' : 'current'}"><strong>Googleで本人確認</strong><span>${trustedDevice ? '✓ この端末は本人確認済みです。' : '本人の記録だけへ接続します。'}</span></li>
+        <li><strong>オフライン準備</strong><span>次の画面で圏外起動を検査します。</span></li>
+        <li><strong>ホーム画面へ追加</strong><span>起床・就寝・メモ・履歴の入口を作ります。</span></li>
+      </ol>
       <section class="setup-auth" aria-labelledby="auth-title">
-        <h2 id="auth-title">Firebase本人確認</h2>
+        <h2 id="auth-title">2. Googleで本人確認</h2>
         ${authMessage}
         ${
           user && owner
-            ? `<p class="result-message success">✓ 本人確認済み</p>
-               <p class="help">この端末では、圏外でも端末内へ記録できます。</p>
-               <p class="help">本人UID（パスワードではありません）</p>
-               <code>${escapeHtml(user.uid)}</code>
+            ? `<p class="result-message success">✓ この端末を本人確認済みにしました</p>
+               <p class="help">圏外でも端末内へ記録し、オンライン時に本人のFirebaseへ同期します。</p>
+               <details><summary>本人UIDを確認</summary><code>${escapeHtml(user.uid)}</code><p class="help">UIDはパスワードではありません。</p></details>
                <button class="primary-button" type="button" data-sign-out>Googleからログアウト</button>
                <p class="help">ログアウトしても、この端末の記録と本人確認済み設定は消えません。</p>`
             : user
               ? `<p class="result-message">このGoogleアカウントは、ろばみみ打刻の本人として登録されていません。</p>
                  <button class="primary-button" type="button" data-sign-out>ログアウト</button>`
-              : '<button class="primary-button" type="button" data-google-sign-in>Googleで本人確認</button>'
+              : `${trustedDevice ? '<p class="result-message success">✓ この端末の本人確認済み設定は保持されています。</p><p class="help">Firebase同期を再開するには、同じGoogleアカウントでログインしてください。</p>' : ''}
+                 <button class="primary-button" type="button" data-google-sign-in>${trustedDevice ? 'Googleへ再ログイン' : 'Googleで本人確認'}</button>`
         }
       </section>
+      ${trustedDevice ? `<section class="setup-next" aria-labelledby="next-title"><h2 id="next-title">次の準備</h2>
+        <nav class="entry-grid" aria-label="ホーム画面入口の準備">
+          <a class="entry wake" href="${BASE_URL}wake/?install=1">起床を準備</a>
+          <a class="entry sleep" href="${BASE_URL}sleep/?install=1">就寝を準備</a>
+          <a class="entry memo" href="${BASE_URL}memo/?install=1">メモを準備</a>
+          <a class="entry history" href="${BASE_URL}history/">履歴を見る</a>
+        </nav><p class="help">本人確認前の端末では、打刻・履歴を開きません。</p></section>` : ''}
     </section>
   `
 

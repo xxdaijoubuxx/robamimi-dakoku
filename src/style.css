@@ -143,6 +143,18 @@ h1 {
   border-top: 1px solid #d8cec0;
 }
 
+.setup-shell { padding-bottom: 24px; }
+.setup-steps { display: grid; gap: 10px; margin: 0 0 24px; padding: 0; list-style: none; }
+.setup-steps li { display: grid; gap: 4px; padding: 14px 16px; border: 1px solid #d8cec0; border-radius: 14px; background: #fffdf9; }
+.setup-steps li::before { content: '○'; color: #846019; font-weight: 800; }
+.setup-steps li.complete::before { content: '✓'; color: #306c3b; }
+.setup-steps li.current { border-color: #a87a24; }
+.setup-steps span { color: #71675e; font-size: .9rem; line-height: 1.5; }
+.setup-auth details { max-width: 100%; }
+.setup-auth summary { color: #625a52; cursor: pointer; }
+.setup-next { display: grid; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #d8cec0; }
+.setup-next h2 { margin: 0; }
+
 .setup-auth h2,
 .setup-auth p {
   margin: 0;
