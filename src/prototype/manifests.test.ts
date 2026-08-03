@@ -31,6 +31,11 @@ describe('Web App Manifest', () => {
     expect(manifest?.scope).toBe(`/robamimi-dakoku/${entry}/`)
   })
 
+  it.each(entries)('%sがscope分離版のManifest URLを参照する', (entry) => {
+    const html = readFileSync(resolve(`${entry}/index.html`), 'utf8')
+    expect(html).toContain(`../manifests/${entry}.webmanifest?v=2`)
+  })
+
   it('ホーム画面の短い表示名が区別できる', () => {
     expect(manifests.map((manifest) => manifest.short_name)).toEqual(['起床', '就寝', 'メモ', '履歴'])
   })
