@@ -1,4 +1,6 @@
-export type EntryKind = 'wake' | 'sleep' | 'memo'
+import type { EntryKind } from '../storage/types'
+
+export type { EntryKind }
 
 export interface PrototypeRecord {
   id: string

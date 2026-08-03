@@ -1,41 +1,17 @@
-import { openDB, type DBSchema } from 'idb'
+import { createRecord, deleteAllPrototypeData, getRecordsNewestFirst } from '../storage/database'
 import type { EntryKind, PrototypeRecord } from './types'
+import type { RecordData } from '../storage/types'
 
-interface PrototypeDatabase extends DBSchema {
-  records: {
-    key: string
-    value: PrototypeRecord
-    indexes: { 'by-occurred-at': string }
-  }
+export async function createPrototypeRecord(kind: EntryKind): Promise<RecordData> {
+  return createRecord(kind)
 }
 
-const databasePromise = openDB<PrototypeDatabase>('robamimi-dakoku-prototype', 1, {
-  upgrade(database) {
-    const records = database.createObjectStore('records', { keyPath: 'id' })
-    records.createIndex('by-occurred-at', 'occurredAt')
-  },
-})
-
-export async function createPrototypeRecord(kind: EntryKind): Promise<PrototypeRecord> {
-  const occurredAt = new Date().toISOString()
-  const record: PrototypeRecord = {
-    id: crypto.randomUUID(),
-    kind,
-    occurredAt,
-    createdAt: occurredAt,
-  }
-  const database = await databasePromise
-  await database.add('records', record)
-  return record
-}
-
-export async function getPrototypeRecords(): Promise<PrototypeRecord[]> {
-  const database = await databasePromise
-  const records = await database.getAllFromIndex('records', 'by-occurred-at')
-  return records.reverse()
+export async function getPrototypeRecords(): Promise<RecordData[]> {
+  return getRecordsNewestFirst()
 }
 
 export async function deleteAllPrototypeRecords(): Promise<void> {
-  const database = await databasePromise
-  await database.clear('records')
+  return deleteAllPrototypeData()
 }
+
+export type { PrototypeRecord }
