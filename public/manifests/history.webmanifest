@@ -4,7 +4,7 @@
   "short_name": "履歴",
   "description": "端末内に保存した打刻履歴を確認します。",
   "start_url": "/robamimi-dakoku/history/",
-  "scope": "/robamimi-dakoku/",
+  "scope": "/robamimi-dakoku/history/",
   "display": "standalone",
   "background_color": "#f6f1e8",
   "theme_color": "#8d7461",

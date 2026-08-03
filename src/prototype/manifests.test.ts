@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 
 interface WebManifest {
   id: string
+  scope: string
   short_name: string
   start_url: string
 }
@@ -23,6 +24,11 @@ describe('Web App Manifest', () => {
   it.each(entries)('%sの開始URLが専用入口を指す', (entry) => {
     const manifest = manifests.find((candidate) => candidate.id.endsWith(`/${entry}`))
     expect(manifest?.start_url).toBe(`/robamimi-dakoku/${entry}/`)
+  })
+
+  it.each(entries)('%sのscopeが専用入口だけを含む', (entry) => {
+    const manifest = manifests.find((candidate) => candidate.id.endsWith(`/${entry}`))
+    expect(manifest?.scope).toBe(`/robamimi-dakoku/${entry}/`)
   })
 
   it('ホーム画面の短い表示名が区別できる', () => {

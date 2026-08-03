@@ -4,7 +4,7 @@
   "short_name": "就寝",
   "description": "就寝時刻を一回で端末内へ記録します。",
   "start_url": "/robamimi-dakoku/sleep/",
-  "scope": "/robamimi-dakoku/",
+  "scope": "/robamimi-dakoku/sleep/",
   "display": "standalone",
   "background_color": "#211e1b",
   "theme_color": "#596a9d",

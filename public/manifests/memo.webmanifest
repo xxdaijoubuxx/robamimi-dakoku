@@ -4,7 +4,7 @@
   "short_name": "メモ",
   "description": "メモ用のタイムスタンプを一回で端末内へ記録します。",
   "start_url": "/robamimi-dakoku/memo/",
-  "scope": "/robamimi-dakoku/",
+  "scope": "/robamimi-dakoku/memo/",
   "display": "standalone",
   "background_color": "#f6f1e8",
   "theme_color": "#729b79",

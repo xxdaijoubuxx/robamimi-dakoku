@@ -4,7 +4,7 @@
   "short_name": "起床",
   "description": "起床時刻を一回で端末内へ記録します。",
   "start_url": "/robamimi-dakoku/wake/",
-  "scope": "/robamimi-dakoku/",
+  "scope": "/robamimi-dakoku/wake/",
   "display": "standalone",
   "background_color": "#f6f1e8",
   "theme_color": "#f2b84b",
