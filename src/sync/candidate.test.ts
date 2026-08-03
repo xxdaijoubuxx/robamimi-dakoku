@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { RecordData, SyncEntry } from '../storage/types'
-import { isPendingNewRecord } from './candidate'
+import { isPendingChangedRecord, isPendingNewRecord } from './candidate'
 
 const record = { id: 'r1', deletedAt: null } as RecordData
 const pending = { recordId: 'r1', status: 'pending', syncedRevision: null } as SyncEntry
@@ -16,5 +16,12 @@ describe('新規記録の再同期対象', () => {
     expect(isPendingNewRecord(record, { ...pending, status: 'synced', syncedRevision: 1 })).toBe(false)
     expect(isPendingNewRecord(record, { ...pending, status: 'conflict' })).toBe(false)
     expect(isPendingNewRecord({ ...record, deletedAt: '2026-08-03T00:00:00Z' }, pending)).toBe(false)
+  })
+})
+
+describe('修正・削除の同期対象', () => {
+  it('最後の同期版より新しい端末版だけを対象にする', () => {
+    expect(isPendingChangedRecord({ ...record, revision: 2 }, { ...pending, syncedRevision: 1 })).toBe(true)
+    expect(isPendingChangedRecord({ ...record, revision: 1 }, { ...pending, syncedRevision: 1 })).toBe(false)
   })
 })

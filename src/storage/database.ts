@@ -12,7 +12,7 @@ import type {
 } from './types'
 import type { PrototypeRecord } from '../prototype/types'
 import { authenticateDevice } from '../auth/device'
-import { isPendingNewRecord } from '../sync/candidate'
+import { isPendingChangedRecord, isPendingNewRecord } from '../sync/candidate'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
 
@@ -187,6 +187,27 @@ export async function getPendingNewRecords(): Promise<RecordData[]> {
   return records
     .filter(isCurrentRecord)
     .filter((record) => isPendingNewRecord(record, syncByRecordId.get(record.id)))
+}
+
+export async function getPendingChangedRecords(): Promise<Array<{ record: RecordData; sync: SyncEntry }>> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'])
+  const records = await transaction.objectStore('records').getAll()
+  const entries = await transaction.objectStore('sync').getAll()
+  await transaction.done
+  const byId = new Map(entries.map((entry) => [entry.recordId, entry]))
+  return records.filter(isCurrentRecord).flatMap((record) => {
+    const sync = byId.get(record.id)
+    return isPendingChangedRecord(record, sync) ? [{ record, sync }] : []
+  })
+}
+
+export async function markRecordConflict(recordId: string, remoteRecord: RecordData): Promise<void> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction('sync', 'readwrite')
+  const sync = await transaction.store.get(recordId)
+  if (sync) await transaction.store.put({ ...sync, status: 'conflict', remoteRecord, errorCode: 'remote-changed' })
+  await transaction.done
 }
 
 export async function importRemoteRecords(records: RecordData[]): Promise<number> {

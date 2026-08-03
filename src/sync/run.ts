@@ -1,11 +1,13 @@
-import { getPendingNewRecords } from '../storage/database'
+import { getPendingChangedRecords, getPendingNewRecords } from '../storage/database'
 import { uploadNewRecord, type UploadOutcome } from './upload'
 import { downloadRemoteRecords } from './download'
+import { uploadChangedRecord } from './change'
 
 export interface SyncRunResult {
   total: number
   outcomes: Record<UploadOutcome, number>
   downloaded: number
+  changed: number
 }
 
 let activeRun: Promise<SyncRunResult> | null = null
@@ -21,8 +23,10 @@ export function syncPendingNewRecords(): Promise<SyncRunResult> {
     for (const record of records) {
       outcomes[await uploadNewRecord(record)] += 1
     }
+    const changedRecords = await getPendingChangedRecords()
+    for (const item of changedRecords) await uploadChangedRecord(item.record, item.sync)
     const downloaded = await downloadRemoteRecords()
-    return { total: records.length + downloaded, outcomes, downloaded }
+    return { total: records.length + changedRecords.length + downloaded, outcomes, downloaded, changed: changedRecords.length }
   })().finally(() => {
     activeRun = null
   })
