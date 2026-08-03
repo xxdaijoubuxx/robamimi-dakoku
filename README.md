@@ -11,7 +11,8 @@
 - 要件定義：合意済み
 - 技術方式：GitHub Pages＋Chrome＋Firebaseで合意済み
 - 設計：合意済み
-- 次の作業：WBS 7.2.7「GitHubリポジトリ作成とPages試作公開」
+- 試作公開：<https://xxdaijoubuxx.github.io/robamimi-dakoku/>
+- 次の作業：WBS 7.2.8「Android 16で四つの独立アイコンを追加」
 
 ## 正本
 
