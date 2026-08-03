@@ -68,8 +68,8 @@ function renderInstallPreview(kind: EntryKind): void {
       <p class="eyebrow">ホーム画面へ追加する準備</p>
       <h1 id="page-title">${label}</h1>
       <p class="description">
-        このページではまだ記録しません。Chromeのメニューから「ホーム画面に追加」または
-        「アプリをインストール」を選んでください。
+        このページではまだ記録しません。Chromeのメニューから「アプリをインストール」を
+        選んでください。「ホーム画面に追加」は別の方式なので使用しません。
       </p>
       <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
     </section>
