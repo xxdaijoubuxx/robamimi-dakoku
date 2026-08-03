@@ -20,8 +20,10 @@ import {
   getHistoryEntries,
   getAppSettings,
   getRecentlyDeletedRecords,
+  getRecordConflict,
   getRecordById,
   restoreRecord,
+  resolveRecordConflict,
   saveAuthenticatedOwner,
   softDeleteRecord,
   updateMemoBody,
@@ -355,13 +357,46 @@ function historyRecordMarkup(entry: HistoryEntry): string {
     : ''
 
   return `
-    <a class="history-record" href="${BASE_URL}history/?record=${encodeURIComponent(record.id)}">
+    <a class="history-record" href="${BASE_URL}history/?${syncStatus === 'conflict' ? 'conflict' : 'record'}=${encodeURIComponent(record.id)}">
       <time datetime="${escapeHtml(record.occurredAt)}">${escapeHtml(historyTimeLabel(record.occurredAt, record.timezone))}</time>
       <strong class="history-kind ${record.kind}">${escapeHtml(labelFor(record.kind))}</strong>
       ${syncStatusMarkup(syncStatus)}
       ${body}
     </a>
   `
+}
+
+function conflictVersionMarkup(title: string, record: RecordData): string {
+  const body = record.kind === 'memo' ? record.body || '（空のメモ）' : '本文なし'
+  return `<section class="conflict-version"><h2>${escapeHtml(title)}</h2>
+    <p>${escapeHtml(labelFor(record.kind))}・${escapeHtml(historyDateLabel(record.occurredAt, record.timezone))}
+    ${escapeHtml(historyTimeLabel(record.occurredAt, record.timezone))}</p>
+    <p class="history-body">${escapeHtml(body)}</p><p class="help">変更版 ${record.revision}</p></section>`
+}
+
+async function renderConflict(recordId: string): Promise<void> {
+  const conflict = await getRecordConflict(recordId)
+  if (!conflict) {
+    app.innerHTML = `<section class="shell"><h1>競合は解決済みです</h1><a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a></section>`
+    return
+  }
+  app.innerHTML = `<section class="shell conflict-shell" aria-labelledby="page-title">
+    <p class="eyebrow">確認が必要な変更</p><h1 id="page-title">残す内容を選択</h1>
+    <p class="description">端末とFirebaseの両方で変更されました。自動では上書きしていません。</p>
+    <div class="conflict-versions">${conflictVersionMarkup('この端末の内容', conflict.local)}${conflictVersionMarkup('Firebaseの内容', conflict.remote)}</div>
+    <button class="primary-button" type="button" data-resolve="local">この端末の内容を残す</button>
+    <button class="secondary-button" type="button" data-resolve="remote">Firebaseの内容を残す</button>
+    <a class="text-link" href="${BASE_URL}history/">今は選ばず履歴へ戻る</a></section>`
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-resolve]')) {
+    button.addEventListener('click', async () => {
+      const choice = button.dataset.resolve as 'local' | 'remote'
+      const confirmed = window.confirm(`${choice === 'local' ? 'この端末' : 'Firebase'}の内容を残しますか？`)
+      if (!confirmed) return
+      await resolveRecordConflict(recordId, choice)
+      if (choice === 'local') await syncPendingNewRecords()
+      window.location.assign(`${BASE_URL}history/`)
+    })
+  }
 }
 
 function showEditorSaveState(state: MemoSaveState): void {
@@ -648,8 +683,11 @@ async function start(): Promise<void> {
   if (entry === 'history') {
     const parameters = new URLSearchParams(window.location.search)
     const recordId = parameters.get('record')
+    const conflictId = parameters.get('conflict')
     if (parameters.get('deleted') === '1') {
       await renderRecentlyDeleted()
+    } else if (conflictId) {
+      await renderConflict(conflictId)
     } else if (recordId) {
       await renderRecordEditor(recordId)
     } else {

@@ -378,6 +378,12 @@ h1 {
   color: #a22e28;
 }
 
+.conflict-versions { display: grid; gap: 1rem; margin: 1.25rem 0; }
+.conflict-version { padding: 1rem; border: 1px solid #d8cbbb; border-radius: 1rem; }
+.conflict-version h2 { margin-top: 0; }
+.conflict-shell > button { width: 100%; margin-bottom: .75rem; }
+.secondary-button { padding: .85rem 1rem; border: 1px solid #785f43; border-radius: .8rem; background: transparent; color: #2d2925; font: inherit; font-weight: 700; }
+
 .history-body {
   display: -webkit-box;
   grid-column: 2 / -1;

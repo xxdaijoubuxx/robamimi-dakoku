@@ -210,6 +210,46 @@ export async function markRecordConflict(recordId: string, remoteRecord: RecordD
   await transaction.done
 }
 
+export async function getRecordConflict(recordId: string): Promise<{ local: RecordData; remote: RecordData } | null> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'])
+  const local = await transaction.objectStore('records').get(recordId)
+  const sync = await transaction.objectStore('sync').get(recordId)
+  await transaction.done
+  if (!local || !isCurrentRecord(local) || sync?.status !== 'conflict' || !sync.remoteRecord) return null
+  return { local, remote: sync.remoteRecord }
+}
+
+export async function resolveRecordConflict(recordId: string, choice: 'local' | 'remote'): Promise<void> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'], 'readwrite')
+  const local = await transaction.objectStore('records').get(recordId)
+  const sync = await transaction.objectStore('sync').get(recordId)
+  if (!local || !isCurrentRecord(local) || sync?.status !== 'conflict' || !sync.remoteRecord) {
+    throw new Error('解決する競合が見つかりません。')
+  }
+  const remote = sync.remoteRecord
+  if (choice === 'remote') {
+    await transaction.objectStore('records').put(remote)
+    await transaction.objectStore('sync').put({
+      ...sync, status: 'synced', syncedRevision: remote.revision, syncedRecord: remote,
+      remoteRecord: null, errorCode: null, lastAttemptAt: new Date().toISOString(),
+    })
+  } else {
+    const resolved = {
+      ...local,
+      revision: Math.max(local.revision, remote.revision) + 1,
+      updatedAt: new Date().toISOString(),
+    }
+    await transaction.objectStore('records').put(resolved)
+    await transaction.objectStore('sync').put({
+      ...sync, status: 'pending', syncedRevision: remote.revision, syncedRecord: remote,
+      remoteRecord: null, errorCode: null,
+    })
+  }
+  await transaction.done
+}
+
 export async function importRemoteRecords(records: RecordData[]): Promise<number> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync', 'settings'], 'readwrite')
