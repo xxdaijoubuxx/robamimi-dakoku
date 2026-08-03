@@ -12,6 +12,7 @@ import type {
 } from './types'
 import type { PrototypeRecord } from '../prototype/types'
 import { authenticateDevice } from '../auth/device'
+import { isPendingNewRecord } from '../sync/candidate'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
 
@@ -174,6 +175,18 @@ export async function getHistoryEntries(): Promise<HistoryEntry[]> {
       record,
       syncStatus: syncByRecordId.get(record.id) ?? 'pending',
     }))
+}
+
+export async function getPendingNewRecords(): Promise<RecordData[]> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync'])
+  const records = await transaction.objectStore('records').getAll()
+  const syncEntries = await transaction.objectStore('sync').getAll()
+  await transaction.done
+  const syncByRecordId = new Map(syncEntries.map((entry) => [entry.recordId, entry]))
+  return records
+    .filter(isCurrentRecord)
+    .filter((record) => isPendingNewRecord(record, syncByRecordId.get(record.id)))
 }
 
 export async function markRecordSynced(uploadedRecord: RecordData): Promise<boolean> {

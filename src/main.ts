@@ -30,6 +30,7 @@ import {
 } from './storage/database'
 import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
 import { uploadNewRecord } from './sync/upload'
+import { syncPendingNewRecords } from './sync/run'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -593,11 +594,28 @@ async function renderHistory(): Promise<void> {
           : '<p class="empty-message">まだ記録がありません。</p>'
       }
       <div class="history-actions">
+        <button class="primary-button" type="button" data-sync-retry>同期を再試行</button>
         <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
         <a class="text-link" href="${BASE_URL}history/?deleted=1">最近削除した記録</a>
       </div>
     </section>
   `
+
+  app.querySelector<HTMLButtonElement>('[data-sync-retry]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    button.disabled = true
+    button.textContent = '同期中…'
+    await syncPendingNewRecords()
+    await renderHistory()
+  })
+}
+
+function startBackgroundSync(refreshHistory = false): void {
+  void syncPendingNewRecords()
+    .then(async (result) => {
+      if (refreshHistory && result.total > 0) await renderHistory()
+    })
+    .catch((error: unknown) => console.error('自動同期を開始できませんでした。', error))
 }
 
 async function registerServiceWorker(): Promise<void> {
@@ -630,10 +648,12 @@ async function start(): Promise<void> {
       await renderRecordEditor(recordId)
     } else {
       await renderHistory()
+      startBackgroundSync(true)
     }
     return
   }
   if (entry === 'wake' || entry === 'sleep' || entry === 'memo') {
+    startBackgroundSync()
     const mode = launchMode(window.location.search)
     if (mode === 'prepare') {
       renderInstallPreview(entry)
@@ -657,4 +677,10 @@ void start().catch((error: unknown) => {
       <p class="result-message">アプリの起動中に問題が発生しました。</p>
     </section>
   `
+})
+
+window.addEventListener('online', () => {
+  void getAppSettings().then((settings) => {
+    if (isDailyUseConfigured(settings)) startBackgroundSync(document.body.dataset.entry === 'history')
+  }).catch((error: unknown) => console.error('オンライン復帰時の同期を開始できませんでした。', error))
 })
