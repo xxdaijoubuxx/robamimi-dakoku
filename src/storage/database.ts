@@ -110,6 +110,11 @@ const readyDatabasePromise = databasePromise.then(async (database) => {
   return database
 })
 
+export async function addDiagnosticLog(log: DiagnosticLog): Promise<void> {
+  const database = await readyDatabasePromise
+  await database.add('diagnostics', log)
+}
+
 export async function getAppSettings(): Promise<AppSettings> {
   const database = await readyDatabasePromise
   const settings = await database.get('settings', 'main')

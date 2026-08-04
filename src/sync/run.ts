@@ -2,6 +2,7 @@ import { getPendingChangedRecords, getPendingNewRecords } from '../storage/datab
 import { uploadNewRecord, type UploadOutcome } from './upload'
 import { downloadRemoteRecords } from './download'
 import { uploadChangedRecord } from './change'
+import { safeErrorCode, writeDiagnosticLog } from '../diagnostics/log'
 
 export interface SyncRunResult {
   total: number
@@ -20,6 +21,7 @@ export function syncPendingNewRecords(): Promise<SyncRunResult> {
   }
 
   activeRun = (async () => {
+    await writeDiagnosticLog('sync-run-start', 'success')
     const result: SyncRunResult = {
       total: 0,
       outcomes: { synced: 0, pending: 0, failed: 0, 'reauth-required': 0 },
@@ -37,8 +39,12 @@ export function syncPendingNewRecords(): Promise<SyncRunResult> {
       result.downloaded += downloaded
       result.changed += changedRecords.length
     } while (rerunRequested)
+    await writeDiagnosticLog('sync-run', 'success')
     return result
-  })().finally(() => {
+  })().catch(async (error: unknown) => {
+    await writeDiagnosticLog('sync-run', 'failure', { errorCode: safeErrorCode(error, 'sync-failed') })
+    throw error
+  }).finally(() => {
     activeRun = null
   })
 

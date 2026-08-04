@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite'
 import { resolve } from 'node:path'
 import { configDefaults } from 'vitest/config'
+import packageJson from './package.json' with { type: 'json' }
 
 export default defineConfig({
   base: '/robamimi-dakoku/',
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+  },
   build: {
     sourcemap: true,
     rollupOptions: {

@@ -6,12 +6,14 @@ import type { RecordData, SyncEntry } from '../storage/types'
 import { failedSyncStatus, firebaseErrorCode } from './error'
 import { firestoreRecord, recordDocumentPath, recordFromFirestore } from './format'
 import type { UploadOutcome } from './upload'
+import { writeDiagnosticLog } from '../diagnostics/log'
 
 export async function uploadChangedRecord(record: RecordData, sync: SyncEntry): Promise<UploadOutcome | 'conflict'> {
   const auth = firebaseAuth()
   await auth.authStateReady()
   if (!auth.currentUser || !isOwnerUid(auth.currentUser.uid)) {
     await markRecordSyncIssue(record.id, 'reauth-required', 'auth-required')
+    await writeDiagnosticLog('sync-record', 'failure', { recordId: record.id, errorCode: 'auth-required' })
     return 'reauth-required'
   }
   try {
@@ -26,12 +28,17 @@ export async function uploadChangedRecord(record: RecordData, sync: SyncEntry): 
     })
     if (conflict) {
       await markRecordConflict(record.id, conflict)
+      await writeDiagnosticLog('conflict-detected', 'failure', { recordId: record.id, errorCode: 'remote-changed' })
       return 'conflict'
     }
-    return await markRecordSynced(record) ? 'synced' : 'pending'
+    const outcome = await markRecordSynced(record) ? 'synced' : 'pending'
+    await writeDiagnosticLog('sync-record', 'success', { recordId: record.id })
+    return outcome
   } catch (error) {
     const status = failedSyncStatus(error)
-    await markRecordSyncIssue(record.id, status, firebaseErrorCode(error))
+    const errorCode = firebaseErrorCode(error)
+    await markRecordSyncIssue(record.id, status, errorCode)
+    await writeDiagnosticLog('sync-record', 'failure', { recordId: record.id, errorCode })
     return status
   }
 }

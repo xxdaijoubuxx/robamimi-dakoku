@@ -44,6 +44,7 @@ import { syncPendingNewRecords } from './sync/run'
 import { checkOfflineReadiness } from './offline/readiness'
 import { downloadRecordsCsv } from './csv/download'
 import { statusAttentionCount, type AppStatusSummary } from './status/summary'
+import { safeErrorCode, writeDiagnosticLog } from './diagnostics/log'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -172,8 +173,16 @@ function renderMemo(record: RecordData): void {
 
   const autosave = createMemoAutosave<string>(
     async (body) => {
-      await updateMemoBody(record.id, body)
-      startBackgroundSync()
+      try {
+        await updateMemoBody(record.id, body)
+        await writeDiagnosticLog('memo-body-save', 'success', { recordId: record.id })
+        startBackgroundSync()
+      } catch (error) {
+        await writeDiagnosticLog('memo-body-save', 'failure', {
+          recordId: record.id, errorCode: safeErrorCode(error, 'local-save-failed'),
+        })
+        throw error
+      }
     },
     showMemoSaveState,
   )
@@ -228,12 +237,15 @@ async function renderSetup(authMessage = ''): Promise<void> {
       if (result.ready) {
         settings = await saveOfflineReady()
         offlineCheck = 'ready'
+        await writeDiagnosticLog('offline-readiness', 'success')
       } else {
         offlineCheck = 'failed'
+        await writeDiagnosticLog('offline-readiness', 'failure', { errorCode: 'cache-incomplete' })
       }
     } catch (error) {
       console.error('オフライン準備の検査に失敗しました。', error)
       offlineCheck = 'failed'
+      await writeDiagnosticLog('offline-readiness', 'failure', { errorCode: safeErrorCode(error, 'check-failed') })
     }
   }
   const trustedDevice = isDailyUseConfigured(settings)
@@ -306,15 +318,23 @@ async function renderSetup(authMessage = ''): Promise<void> {
   app.querySelector<HTMLButtonElement>('[data-google-sign-in]')?.addEventListener('click', async () => {
     try {
       await signInWithPopup(auth, new GoogleAuthProvider())
+      await writeDiagnosticLog('google-sign-in', 'success')
       await renderSetup()
     } catch (error) {
       console.error(error)
+      await writeDiagnosticLog('google-sign-in', 'failure', { errorCode: safeErrorCode(error, 'sign-in-failed') })
       await renderSetup('<p class="result-message">Googleログインを完了できませんでした。もう一度お試しください。</p>')
     }
   })
   app.querySelector<HTMLButtonElement>('[data-sign-out]')?.addEventListener('click', async () => {
-    await signOut(auth)
-    await renderSetup()
+    try {
+      await signOut(auth)
+      await writeDiagnosticLog('google-sign-out', 'success')
+      await renderSetup()
+    } catch (error) {
+      await writeDiagnosticLog('google-sign-out', 'failure', { errorCode: safeErrorCode(error, 'sign-out-failed') })
+      throw error
+    }
   })
   app.querySelector<HTMLButtonElement>('[data-offline-retry]')?.addEventListener('click', () => void renderSetup())
   for (const button of app.querySelectorAll<HTMLButtonElement>('[data-shortcut-added]')) {
@@ -382,6 +402,7 @@ async function renderAction(kind: EntryKind): Promise<void> {
 
   try {
     const record = await createPrototypeRecord(kind)
+    await writeDiagnosticLog('local-record-save', 'success', { recordId: record.id })
     window.history.replaceState(null, '', completedLaunchUrl(BASE_URL, kind))
     if (kind === 'wake' || kind === 'sleep') {
       let hasRecentSameKind = false
@@ -398,6 +419,7 @@ async function renderAction(kind: EntryKind): Promise<void> {
     startNewRecordUpload(record)
   } catch (error) {
     console.error(error)
+    await writeDiagnosticLog('local-record-save', 'failure', { errorCode: safeErrorCode(error, 'local-save-failed') })
     app.innerHTML = `
       <section class="shell action-shell error" aria-labelledby="page-title">
         <p class="eyebrow">保存失敗</p>
@@ -482,6 +504,7 @@ async function renderConflict(recordId: string): Promise<void> {
       const confirmed = window.confirm(`${choice === 'local' ? 'この端末' : 'Firebase'}の内容を残しますか？`)
       if (!confirmed) return
       await resolveRecordConflict(recordId, choice)
+      await writeDiagnosticLog('conflict-resolved', 'success', { recordId })
       if (choice === 'local') await syncPendingNewRecords()
       window.location.assign(`${BASE_URL}history/`)
     })
@@ -572,13 +595,21 @@ async function renderRecordEditor(recordId: string): Promise<void> {
   }
 
   async function persistDraft(draft: RecordDraft): Promise<void> {
-    const changes: RecordChanges = { kind: draft.kind, body: draft.body }
-    if (draft.localDateTime !== lastSavedDraft.localDateTime) {
-      changes.occurredAt = localDateTimeToIso(draft.localDateTime)
-      changes.timezone = currentTimezone()
+    try {
+      const changes: RecordChanges = { kind: draft.kind, body: draft.body }
+      if (draft.localDateTime !== lastSavedDraft.localDateTime) {
+        changes.occurredAt = localDateTimeToIso(draft.localDateTime)
+        changes.timezone = currentTimezone()
+      }
+      const updatedRecord = await updateRecord(recordId, changes)
+      lastSavedDraft = draftFromRecord(updatedRecord)
+      await writeDiagnosticLog('local-record-save', 'success', { recordId })
+    } catch (error) {
+      await writeDiagnosticLog('local-record-save', 'failure', {
+        recordId, errorCode: safeErrorCode(error, 'local-save-failed'),
+      })
+      throw error
     }
-    const updatedRecord = await updateRecord(recordId, changes)
-    lastSavedDraft = draftFromRecord(updatedRecord)
   }
 
   const autosave = createMemoAutosave<RecordDraft>(persistDraft, showEditorSaveState)
@@ -631,9 +662,13 @@ async function renderRecordEditor(recordId: string): Promise<void> {
       await autosave.flush()
       await persistDraft(readDraft())
       await softDeleteRecord(recordId)
+      await writeDiagnosticLog('local-record-delete', 'success', { recordId })
       window.location.assign(`${BASE_URL}history/`)
     } catch (error) {
       console.error(error)
+      await writeDiagnosticLog('local-record-delete', 'failure', {
+        recordId, errorCode: safeErrorCode(error, 'local-delete-failed'),
+      })
       deleteButton.disabled = false
       window.alert('端末内の保存に失敗したため、削除しませんでした。')
     }
@@ -692,9 +727,13 @@ async function renderRecentlyDeleted(): Promise<void> {
       button.disabled = true
       try {
         await restoreRecord(recordId)
+        await writeDiagnosticLog('local-record-restore', 'success', { recordId })
         await renderRecentlyDeleted()
       } catch (error) {
         console.error(error)
+        await writeDiagnosticLog('local-record-restore', 'failure', {
+          recordId, errorCode: safeErrorCode(error, 'local-restore-failed'),
+        })
         button.disabled = false
         window.alert('記録を復元できませんでした。')
       }
@@ -808,8 +847,10 @@ async function renderHistory(): Promise<void> {
         status.textContent = `✓ ${result.filename} の保存を開始しました（${result.count}件）。${period}`
         status.dataset.state = 'success'
       }
+      await writeDiagnosticLog('csv-export', 'success')
     } catch (error) {
       console.error('CSVを保存できませんでした。', error)
+      await writeDiagnosticLog('csv-export', 'failure', { errorCode: safeErrorCode(error, 'export-failed') })
       if (status) {
         status.textContent = '⚠ CSVを保存できませんでした。もう一度お試しください。'
         status.dataset.state = 'failed'
@@ -840,12 +881,25 @@ async function registerServiceWorker(): Promise<void> {
   if (!import.meta.env.PROD || !('serviceWorker' in navigator)) {
     return
   }
-  await navigator.serviceWorker.register(`${BASE_URL}sw.js`, { scope: BASE_URL })
+  try {
+    await navigator.serviceWorker.register(`${BASE_URL}sw.js`, { scope: BASE_URL })
+    await writeDiagnosticLog('service-worker-register', 'success')
+  } catch (error) {
+    console.error('Service Workerを登録できませんでした。', error)
+    await writeDiagnosticLog('service-worker-register', 'failure', { errorCode: safeErrorCode(error, 'register-failed') })
+  }
 }
 
 async function start(): Promise<void> {
   await registerServiceWorker()
   const entry = document.body.dataset.entry
+  const launchOperations = {
+    setup: 'app-launch-setup', wake: 'app-launch-wake', sleep: 'app-launch-sleep',
+    memo: 'app-launch-memo', history: 'app-launch-history',
+  } as const
+  if (entry && entry in launchOperations) {
+    await writeDiagnosticLog(launchOperations[entry as keyof typeof launchOperations], 'success')
+  }
 
   if (entry === 'setup') {
     await renderSetup()

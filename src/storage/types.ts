@@ -46,11 +46,17 @@ export interface AppSettings {
 
 export type DiagnosticOutcome = 'success' | 'failure'
 
+export type DiagnosticOperation =
+  | 'app-launch-setup' | 'app-launch-wake' | 'app-launch-sleep' | 'app-launch-memo' | 'app-launch-history'
+  | 'local-record-save' | 'local-record-delete' | 'local-record-restore' | 'memo-body-save'
+  | 'sync-run-start' | 'sync-run' | 'sync-record' | 'google-sign-in' | 'google-sign-out'
+  | 'conflict-detected' | 'conflict-resolved' | 'csv-export' | 'offline-readiness' | 'service-worker-register'
+
 export interface DiagnosticLog {
   id?: number
   occurredAt: string
   appVersion: string
-  operation: string
+  operation: DiagnosticOperation
   outcome: DiagnosticOutcome
   errorCode: string | null
   recordId: string | null
