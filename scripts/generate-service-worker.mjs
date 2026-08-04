@@ -38,7 +38,7 @@ const BASE_PATH = ${JSON.stringify(basePath)}
 const PRECACHE_URLS = ${JSON.stringify(precacheUrls, null, 2)}
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting()))
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)))
 })
 
 self.addEventListener('activate', (event) => {
