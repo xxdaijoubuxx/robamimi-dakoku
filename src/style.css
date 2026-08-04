@@ -494,6 +494,28 @@ h1 {
   justify-content: space-between;
 }
 
+.csv-export {
+  display: grid;
+  flex-basis: 100%;
+  gap: 8px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid #d8cec0;
+}
+
+.csv-export p {
+  margin: 0;
+}
+
+.csv-export-status[data-state='success'] {
+  color: #306c3b;
+  font-weight: 700;
+}
+
+.csv-export-status[data-state='failed'] {
+  color: #a22e28;
+  font-weight: 700;
+}
+
 .text-link {
   color: #59493c;
   font-weight: 700;

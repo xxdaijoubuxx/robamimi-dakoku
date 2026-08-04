@@ -18,6 +18,7 @@ import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
   createRecord,
+  getRecordsNewestFirst,
   getHistoryEntries,
   getAppSettings,
   getRecentlyDeletedRecords,
@@ -40,6 +41,7 @@ import type { HistoryEntry, RecordData, ShortcutKind, SyncStatus } from './stora
 import { uploadNewRecord } from './sync/upload'
 import { syncPendingNewRecords } from './sync/run'
 import { checkOfflineReadiness } from './offline/readiness'
+import { downloadRecordsCsv } from './csv/download'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -714,12 +716,42 @@ async function renderHistory(): Promise<void> {
           : '<p class="empty-message">まだ記録がありません。</p>'
       }
       <div class="history-actions">
+        <div class="csv-export">
+          <button class="primary-button" type="button" data-csv-download>CSVを保存</button>
+          <p class="help">端末内にある記録を全件保存します。削除済み記録は含みません。</p>
+          <p class="csv-export-status" data-csv-status aria-live="polite"></p>
+        </div>
         <button class="primary-button" type="button" data-sync-retry>同期を再試行</button>
         <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
         <a class="text-link" href="${BASE_URL}history/?deleted=1">最近削除した記録</a>
       </div>
     </section>
   `
+
+  app.querySelector<HTMLButtonElement>('[data-csv-download]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    const status = app.querySelector<HTMLElement>('[data-csv-status]')
+    button.disabled = true
+    if (status) status.textContent = 'CSVを作成中…'
+    try {
+      const result = downloadRecordsCsv(await getRecordsNewestFirst())
+      const period = result.newest && result.oldest
+        ? ` 最新：${historyDateLabel(result.newest.occurredAt, result.newest.timezone)}、最古：${historyDateLabel(result.oldest.occurredAt, result.oldest.timezone)}`
+        : ''
+      if (status) {
+        status.textContent = `✓ ${result.filename} の保存を開始しました（${result.count}件）。${period}`
+        status.dataset.state = 'success'
+      }
+    } catch (error) {
+      console.error('CSVを保存できませんでした。', error)
+      if (status) {
+        status.textContent = '⚠ CSVを保存できませんでした。もう一度お試しください。'
+        status.dataset.state = 'failed'
+      }
+    } finally {
+      button.disabled = false
+    }
+  })
 
   app.querySelector<HTMLButtonElement>('[data-sync-retry]')?.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement
