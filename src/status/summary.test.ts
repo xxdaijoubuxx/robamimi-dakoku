@@ -28,7 +28,7 @@ describe('アプリ状態の集計', () => {
     )
     expect(summary).toEqual({
       recordCount: 1, pendingCount: 1, failedCount: 1, reauthRequiredCount: 1, conflictCount: 1,
-      lastSyncAt: settings.lastSyncAt, offlineReady: true,
+      lastSyncAt: settings.lastSyncAt, offlineReady: true, dataVersion: 2,
     })
     expect(statusAttentionCount(summary)).toBe(4)
   })

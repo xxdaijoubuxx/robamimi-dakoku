@@ -8,6 +8,7 @@ export interface AppStatusSummary {
   conflictCount: number
   lastSyncAt: string | null
   offlineReady: boolean
+  dataVersion: number
 }
 
 export function summarizeAppStatus(
@@ -24,6 +25,7 @@ export function summarizeAppStatus(
     conflictCount: count('conflict'),
     lastSyncAt: settings.lastSyncAt,
     offlineReady: settings.setupStage === 'offline-ready' || settings.setupStage === 'complete',
+    dataVersion: settings.dataVersion,
   }
 }
 

@@ -18,7 +18,9 @@ import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
   createRecord,
+  clearDiagnosticLogs,
   getAppStatusSummary,
+  getDiagnosticLogsNewestFirst,
   getRecordsNewestFirst,
   getHistoryEntries,
   getAppSettings,
@@ -45,6 +47,7 @@ import { checkOfflineReadiness } from './offline/readiness'
 import { downloadRecordsCsv } from './csv/download'
 import { statusAttentionCount, type AppStatusSummary } from './status/summary'
 import { safeErrorCode, writeDiagnosticLog } from './diagnostics/log'
+import { downloadDiagnosticExport } from './diagnostics/export'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -747,10 +750,12 @@ function lastSyncLabel(summary: AppStatusSummary): string {
 
 async function renderAppStatus(): Promise<void> {
   const summary = await getAppStatusSummary()
+  const diagnosticLogs = await getDiagnosticLogsNewestFirst()
   const auth = firebaseAuth()
   await auth.authStateReady()
   const user = auth.currentUser
   const login = user ? (isOwnerUid(user.uid) ? '有効' : '別のアカウント') : '未ログイン'
+  const googleLogin = user ? (isOwnerUid(user.uid) ? 'active' : 'different-account') : 'signed-out'
   app.innerHTML = `
     <section class="shell status-shell" aria-labelledby="page-title">
       <p class="eyebrow">本文を含まない確認情報</p>
@@ -765,14 +770,45 @@ async function renderAppStatus(): Promise<void> {
         <div><dt>確認が必要な変更</dt><dd>${summary.conflictCount}件</dd></div>
         <div><dt>最終同期</dt><dd>${escapeHtml(lastSyncLabel(summary))}</dd></div>
         <div><dt>オフライン準備</dt><dd>${summary.offlineReady ? '完了' : '未完了'}</dd></div>
+        <div><dt>診断ログ</dt><dd>${diagnosticLogs.length}件</dd></div>
       </dl>
       <div class="status-actions">
         <button class="primary-button" type="button" data-status-sync>同期を再試行</button>
+        <button class="primary-button" type="button" data-diagnostics-download>診断情報を保存</button>
+        <button class="danger-button" type="button" data-diagnostics-clear>診断ログだけを消去</button>
         <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
       </div>
       <p class="help" data-status-message aria-live="polite">記録本文やGoogleの認証情報は表示していません。</p>
     </section>
   `
+
+  app.querySelector<HTMLButtonElement>('[data-diagnostics-download]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    const message = app.querySelector<HTMLElement>('[data-status-message]')
+    button.disabled = true
+    try {
+      const filename = downloadDiagnosticExport(
+        await getAppStatusSummary(),
+        await getDiagnosticLogsNewestFirst(),
+        { online: navigator.onLine, googleLogin },
+      )
+      await writeDiagnosticLog('diagnostics-export', 'success')
+      if (message) message.textContent = `✓ ${filename} の保存を開始しました。`
+    } catch (error) {
+      await writeDiagnosticLog('diagnostics-export', 'failure', {
+        errorCode: safeErrorCode(error, 'export-failed'),
+      })
+      if (message) message.textContent = '⚠ 診断情報を保存できませんでした。もう一度お試しください。'
+    } finally {
+      button.disabled = false
+    }
+  })
+
+  app.querySelector<HTMLButtonElement>('[data-diagnostics-clear]')?.addEventListener('click', async () => {
+    if (!window.confirm('端末内の診断ログだけを消去しますか？ 打刻記録は消えません。')) return
+    await clearDiagnosticLogs()
+    await renderAppStatus()
+  })
 
   app.querySelector<HTMLButtonElement>('[data-status-sync]')?.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement

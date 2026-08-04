@@ -15,6 +15,7 @@ import type { PrototypeRecord } from '../prototype/types'
 import { authenticateDevice, markDeviceOfflineReady } from '../auth/device'
 import { isPendingChangedRecord, isPendingNewRecord } from '../sync/candidate'
 import { summarizeAppStatus, type AppStatusSummary } from '../status/summary'
+import { diagnosticIdsToDelete } from '../diagnostics/retention'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
 
@@ -112,7 +113,21 @@ const readyDatabasePromise = databasePromise.then(async (database) => {
 
 export async function addDiagnosticLog(log: DiagnosticLog): Promise<void> {
   const database = await readyDatabasePromise
-  await database.add('diagnostics', log)
+  const transaction = database.transaction('diagnostics', 'readwrite')
+  await transaction.store.add(log)
+  const logs = await transaction.store.index('by-occurred-at').getAll()
+  for (const id of diagnosticIdsToDelete(logs)) await transaction.store.delete(id)
+  await transaction.done
+}
+
+export async function getDiagnosticLogsNewestFirst(): Promise<DiagnosticLog[]> {
+  const database = await readyDatabasePromise
+  return (await database.getAllFromIndex('diagnostics', 'by-occurred-at')).reverse()
+}
+
+export async function clearDiagnosticLogs(): Promise<void> {
+  const database = await readyDatabasePromise
+  await database.clear('diagnostics')
 }
 
 export async function getAppSettings(): Promise<AppSettings> {
