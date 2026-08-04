@@ -25,3 +25,13 @@ export function authenticateDevice(settings: AppSettings, uid: string): AppSetti
       : settings.setupStage,
   }
 }
+
+export function markDeviceOfflineReady(settings: AppSettings): AppSettings {
+  if (!isDailyUseConfigured(settings)) throw new Error('本人確認前にオフライン準備を完了できません。')
+  return {
+    ...settings,
+    setupStage: SETUP_STAGE_ORDER[settings.setupStage] < SETUP_STAGE_ORDER['offline-ready']
+      ? 'offline-ready'
+      : settings.setupStage,
+  }
+}

@@ -154,6 +154,8 @@ h1 {
 .setup-auth summary { color: #625a52; cursor: pointer; }
 .setup-next { display: grid; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #d8cec0; }
 .setup-next h2 { margin: 0; }
+.offline-check { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #d8cec0; }
+.offline-check h2, .offline-check p { margin: 0; }
 
 .setup-auth h2,
 .setup-auth p {

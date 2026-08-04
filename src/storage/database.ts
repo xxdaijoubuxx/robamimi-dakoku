@@ -11,7 +11,7 @@ import type {
   SyncStatus,
 } from './types'
 import type { PrototypeRecord } from '../prototype/types'
-import { authenticateDevice } from '../auth/device'
+import { authenticateDevice, markDeviceOfflineReady } from '../auth/device'
 import { isPendingChangedRecord, isPendingNewRecord } from '../sync/candidate'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
@@ -123,6 +123,13 @@ export async function saveAuthenticatedOwner(uid: string): Promise<AppSettings> 
   const authenticated = authenticateDevice(settings, uid)
   await database.put('settings', authenticated)
   return authenticated
+}
+
+export async function saveOfflineReady(): Promise<AppSettings> {
+  const database = await readyDatabasePromise
+  const ready = markDeviceOfflineReady(await getAppSettings())
+  await database.put('settings', ready)
+  return ready
 }
 
 export async function createRecord(kind: EntryKind): Promise<RecordData> {

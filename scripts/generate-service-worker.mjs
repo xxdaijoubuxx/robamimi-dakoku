@@ -79,6 +79,21 @@ self.addEventListener('fetch', (event) => {
     }),
   )
 })
+
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'CHECK_OFFLINE_READY' || !event.ports[0]) return
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then(async (cache) => {
+        const missing = []
+        for (const url of PRECACHE_URLS) {
+          if (!(await cache.match(url))) missing.push(url)
+        }
+        event.ports[0].postMessage({ ready: missing.length === 0, missing })
+      })
+      .catch(() => event.ports[0].postMessage({ ready: false, missing: PRECACHE_URLS })),
+  )
+})
 `
 
 await writeFile(join(outputDirectory, 'sw.js'), source)

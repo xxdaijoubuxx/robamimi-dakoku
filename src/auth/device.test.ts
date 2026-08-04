@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { OWNER_UID } from '../firebase/owner'
 import { createInitialSettings } from '../storage/migrations'
-import { authenticateDevice, isDailyUseConfigured } from './device'
+import { authenticateDevice, isDailyUseConfigured, markDeviceOfflineReady } from './device'
 
 describe('端末の本人確認', () => {
   it('未設定の端末では日常画面を許可しない', () => {
@@ -30,5 +30,11 @@ describe('端末の本人確認', () => {
     }
 
     expect(authenticateDevice(settings, OWNER_UID).setupStage).toBe('complete')
+  })
+
+  it('本人確認済み端末だけをオフライン準備完了へ進める', () => {
+    expect(() => markDeviceOfflineReady(createInitialSettings('device-1'))).toThrow()
+    const authenticated = authenticateDevice(createInitialSettings('device-1'), OWNER_UID)
+    expect(markDeviceOfflineReady(authenticated).setupStage).toBe('offline-ready')
   })
 })

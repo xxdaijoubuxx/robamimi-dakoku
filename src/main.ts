@@ -25,6 +25,7 @@ import {
   restoreRecord,
   resolveRecordConflict,
   saveAuthenticatedOwner,
+  saveOfflineReady,
   softDeleteRecord,
   updateMemoBody,
   updateRecord,
@@ -33,6 +34,7 @@ import {
 import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
 import { uploadNewRecord } from './sync/upload'
 import { syncPendingNewRecords } from './sync/run'
+import { checkOfflineReadiness } from './offline/readiness'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -204,8 +206,24 @@ async function renderSetup(authMessage = ''): Promise<void> {
       console.error('初回ログイン後のFirebase取得に失敗しました。', error)
     }
   }
-  const settings = await getAppSettings()
+  let settings = await getAppSettings()
+  let offlineCheck: 'not-run' | 'ready' | 'failed' = 'not-run'
+  if (isDailyUseConfigured(settings)) {
+    try {
+      const result = await checkOfflineReadiness()
+      if (result.ready) {
+        settings = await saveOfflineReady()
+        offlineCheck = 'ready'
+      } else {
+        offlineCheck = 'failed'
+      }
+    } catch (error) {
+      console.error('オフライン準備の検査に失敗しました。', error)
+      offlineCheck = 'failed'
+    }
+  }
   const trustedDevice = isDailyUseConfigured(settings)
+  const offlineReady = settings.setupStage === 'offline-ready' || settings.setupStage === 'complete'
 
   app.innerHTML = `
     <section class="shell setup-shell" aria-labelledby="page-title">
@@ -218,7 +236,7 @@ async function renderSetup(authMessage = ''): Promise<void> {
       <ol class="setup-steps" aria-label="初回設定の進み具合">
         <li class="complete"><strong>使い方を確認</strong><span>端末保存を先に行い、圏外でも打刻します。</span></li>
         <li class="${trustedDevice ? 'complete' : 'current'}"><strong>Googleで本人確認</strong><span>${trustedDevice ? '✓ この端末は本人確認済みです。' : '本人の記録だけへ接続します。'}</span></li>
-        <li><strong>オフライン準備</strong><span>次の画面で圏外起動を検査します。</span></li>
+        <li class="${offlineReady ? 'complete' : trustedDevice ? 'current' : ''}"><strong>オフライン準備</strong><span>${offlineReady ? '✓ 必要な画面をこの端末に保存済みです。' : '必要な画面が端末に保存されたか検査します。'}</span></li>
         <li><strong>ホーム画面へ追加</strong><span>起床・就寝・メモ・履歴の入口を作ります。</span></li>
       </ol>
       <section class="setup-auth" aria-labelledby="auth-title">
@@ -238,6 +256,9 @@ async function renderSetup(authMessage = ''): Promise<void> {
                  <button class="primary-button" type="button" data-google-sign-in>${trustedDevice ? 'Googleへ再ログイン' : 'Googleで本人確認'}</button>`
         }
       </section>
+      ${trustedDevice ? `<section class="offline-check" aria-labelledby="offline-title"><h2 id="offline-title">3. オフライン準備</h2>
+        ${offlineCheck === 'ready' ? '<p class="result-message success">✓ オフライン準備完了</p><p class="help">起床・就寝・メモ・履歴に必要なファイルを端末内で確認しました。</p>' : '<p class="result-message">⚠ オフライン準備を確認できませんでした。</p><button class="primary-button" type="button" data-offline-retry>もう一度検査</button>'}
+      </section>` : ''}
       ${trustedDevice ? `<section class="setup-next" aria-labelledby="next-title"><h2 id="next-title">次の準備</h2>
         <nav class="entry-grid" aria-label="ホーム画面入口の準備">
           <a class="entry wake" href="${BASE_URL}wake/?install=1">起床を準備</a>
@@ -261,6 +282,7 @@ async function renderSetup(authMessage = ''): Promise<void> {
     await signOut(auth)
     await renderSetup()
   })
+  app.querySelector<HTMLButtonElement>('[data-offline-retry]')?.addEventListener('click', () => void renderSetup())
 }
 
 function renderSetupRequired(): void {
