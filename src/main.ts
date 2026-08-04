@@ -195,17 +195,16 @@ function renderMemo(record: RecordData): void {
 }
 
 async function renderSetup(authMessage = ''): Promise<void> {
+  app.innerHTML = `<section class="shell" aria-live="polite"><p class="eyebrow">ろばみみ打刻</p><h1>設定を確認中</h1><p class="description">端末内の設定を読み込んでいます。</p></section>`
   const auth = firebaseAuth()
   await auth.authStateReady()
   const user = auth.currentUser
   const owner = user ? isOwnerUid(user.uid) : false
   if (user && owner) {
     await saveAuthenticatedOwner(user.uid)
-    try {
-      await syncPendingNewRecords()
-    } catch (error) {
+    void syncPendingNewRecords().catch((error: unknown) => {
       console.error('初回ログイン後のFirebase取得に失敗しました。', error)
-    }
+    })
   }
   let settings = await getAppSettings()
   let offlineCheck: 'not-run' | 'ready' | 'failed' = 'not-run'
