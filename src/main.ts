@@ -18,6 +18,7 @@ import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
   createRecord,
+  getAppStatusSummary,
   getRecordsNewestFirst,
   getHistoryEntries,
   getAppSettings,
@@ -42,6 +43,7 @@ import { uploadNewRecord } from './sync/upload'
 import { syncPendingNewRecords } from './sync/run'
 import { checkOfflineReadiness } from './offline/readiness'
 import { downloadRecordsCsv } from './csv/download'
+import { statusAttentionCount, type AppStatusSummary } from './status/summary'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -76,6 +78,12 @@ function formatTime(isoDate: string): string {
   return new Intl.DateTimeFormat('ja-JP', {
     hour: '2-digit',
     minute: '2-digit',
+  }).format(new Date(isoDate))
+}
+
+function formatDateTime(isoDate: string): string {
+  return new Intl.DateTimeFormat('ja-JP', {
+    month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit',
   }).format(new Date(isoDate))
 }
 
@@ -694,13 +702,71 @@ async function renderRecentlyDeleted(): Promise<void> {
   }
 }
 
+function lastSyncLabel(summary: AppStatusSummary): string {
+  return summary.lastSyncAt ? formatDateTime(summary.lastSyncAt) : 'まだありません'
+}
+
+async function renderAppStatus(): Promise<void> {
+  const summary = await getAppStatusSummary()
+  const auth = firebaseAuth()
+  await auth.authStateReady()
+  const user = auth.currentUser
+  const login = user ? (isOwnerUid(user.uid) ? '有効' : '別のアカウント') : '未ログイン'
+  app.innerHTML = `
+    <section class="shell status-shell" aria-labelledby="page-title">
+      <p class="eyebrow">本文を含まない確認情報</p>
+      <h1 id="page-title">アプリ状態</h1>
+      <dl class="status-card app-status-card">
+        <div><dt>通信</dt><dd>${navigator.onLine ? 'オンライン' : 'オフライン'}</dd></div>
+        <div><dt>Googleログイン</dt><dd>${login}</dd></div>
+        <div><dt>端末内記録</dt><dd>${summary.recordCount}件</dd></div>
+        <div><dt>同期待ち</dt><dd>${summary.pendingCount}件</dd></div>
+        <div><dt>同期失敗</dt><dd>${summary.failedCount}件</dd></div>
+        <div><dt>再ログインが必要</dt><dd>${summary.reauthRequiredCount}件</dd></div>
+        <div><dt>確認が必要な変更</dt><dd>${summary.conflictCount}件</dd></div>
+        <div><dt>最終同期</dt><dd>${escapeHtml(lastSyncLabel(summary))}</dd></div>
+        <div><dt>オフライン準備</dt><dd>${summary.offlineReady ? '完了' : '未完了'}</dd></div>
+      </dl>
+      <div class="status-actions">
+        <button class="primary-button" type="button" data-status-sync>同期を再試行</button>
+        <a class="secondary-link" href="${BASE_URL}history/">履歴へ戻る</a>
+      </div>
+      <p class="help" data-status-message aria-live="polite">記録本文やGoogleの認証情報は表示していません。</p>
+    </section>
+  `
+
+  app.querySelector<HTMLButtonElement>('[data-status-sync]')?.addEventListener('click', async (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    const message = app.querySelector<HTMLElement>('[data-status-message]')
+    button.disabled = true
+    button.textContent = '同期中…'
+    if (message) message.textContent = 'Firebaseとの同期を確認しています。'
+    try {
+      await syncPendingNewRecords()
+      await renderAppStatus()
+    } catch (error) {
+      console.error('状態画面から同期を再試行できませんでした。', error)
+      button.disabled = false
+      button.textContent = '同期を再試行'
+      if (message) message.textContent = '⚠ 同期を完了できませんでした。端末内の記録は保持されています。'
+    }
+  })
+}
+
 async function renderHistory(): Promise<void> {
   const entries = await getHistoryEntries()
+  const statusSummary = await getAppStatusSummary()
+  const attentionCount = statusAttentionCount(statusSummary)
   const groups = groupHistoryEntries(entries)
   app.innerHTML = `
     <section class="shell history-shell" aria-labelledby="page-title">
       <p class="eyebrow">端末内の記録</p>
       <h1 id="page-title">履歴</h1>
+      <div class="history-status ${attentionCount > 0 ? 'attention' : ''}">
+        <p>最終同期：${escapeHtml(lastSyncLabel(statusSummary))}</p>
+        ${attentionCount > 0 ? `<p>⚠ 確認が必要な同期状態が${attentionCount}件あります。</p>` : ''}
+        <a class="text-link" href="${BASE_URL}history/?status=1">状態を確認</a>
+      </div>
       ${
         groups.length > 0
           ? `<div class="history-groups">${groups
@@ -795,7 +861,9 @@ async function start(): Promise<void> {
     const parameters = new URLSearchParams(window.location.search)
     const recordId = parameters.get('record')
     const conflictId = parameters.get('conflict')
-    if (parameters.get('deleted') === '1') {
+    if (parameters.get('status') === '1') {
+      await renderAppStatus()
+    } else if (parameters.get('deleted') === '1') {
       await renderRecentlyDeleted()
     } else if (conflictId) {
       await renderConflict(conflictId)

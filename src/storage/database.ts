@@ -14,6 +14,7 @@ import type {
 import type { PrototypeRecord } from '../prototype/types'
 import { authenticateDevice, markDeviceOfflineReady } from '../auth/device'
 import { isPendingChangedRecord, isPendingNewRecord } from '../sync/candidate'
+import { summarizeAppStatus, type AppStatusSummary } from '../status/summary'
 
 const DATABASE_NAME = 'robamimi-dakoku-prototype'
 
@@ -228,6 +229,17 @@ export async function getHistoryEntries(): Promise<HistoryEntry[]> {
     }))
 }
 
+export async function getAppStatusSummary(): Promise<AppStatusSummary> {
+  const database = await readyDatabasePromise
+  const transaction = database.transaction(['records', 'sync', 'settings'])
+  const records = await transaction.objectStore('records').getAll()
+  const syncEntries = await transaction.objectStore('sync').getAll()
+  const settings = await transaction.objectStore('settings').get('main')
+  await transaction.done
+  if (!settings) throw new Error('端末設定が見つかりません。')
+  return summarizeAppStatus(records.filter(isCurrentRecord), syncEntries, settings)
+}
+
 export async function getPendingNewRecords(): Promise<RecordData[]> {
   const database = await readyDatabasePromise
   const transaction = database.transaction(['records', 'sync'])
@@ -320,10 +332,8 @@ export async function importRemoteRecords(records: RecordData[]): Promise<number
     })
     imported += 1
   }
-  if (imported > 0) {
-    const settings = await transaction.objectStore('settings').get('main')
-    if (settings) await transaction.objectStore('settings').put({ ...settings, lastSyncAt: new Date().toISOString() })
-  }
+  const settings = await transaction.objectStore('settings').get('main')
+  if (settings) await transaction.objectStore('settings').put({ ...settings, lastSyncAt: new Date().toISOString() })
   await transaction.done
   return imported
 }

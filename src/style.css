@@ -335,6 +335,43 @@ h1 {
   margin: 24px 0;
 }
 
+.history-status {
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 14px 16px;
+  border: 1px solid #d8cec0;
+  border-radius: 14px;
+  background: #fffdf9;
+}
+
+.history-status.attention {
+  border-color: #c58c29;
+  background: #fff6df;
+}
+
+.history-status p {
+  margin: 0;
+}
+
+.status-shell,
+.status-actions {
+  display: grid;
+  gap: 16px;
+}
+
+.app-status-card {
+  margin-top: 24px;
+}
+
+.app-status-card div {
+  grid-template-columns: minmax(8.5rem, 1fr) auto;
+}
+
+.status-actions {
+  grid-template-columns: 1fr;
+}
+
 .history-day h2 {
   margin: 0;
   color: #71675e;
@@ -598,6 +635,16 @@ h1 {
   .history-day-records {
     border-color: #51483f;
     background: #51483f;
+  }
+
+  .history-status {
+    border-color: #51483f;
+    background: #2b2723;
+  }
+
+  .history-status.attention {
+    border-color: #a87a24;
+    background: #3a3020;
   }
 
   .history-record {
