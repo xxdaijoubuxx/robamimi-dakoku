@@ -9,6 +9,7 @@ import type {
   RecordData,
   SyncEntry,
   SyncStatus,
+  ShortcutKind,
 } from './types'
 import type { PrototypeRecord } from '../prototype/types'
 import { authenticateDevice, markDeviceOfflineReady } from '../auth/device'
@@ -114,7 +115,23 @@ export async function getAppSettings(): Promise<AppSettings> {
   if (!settings) {
     throw new Error('端末設定が初期化されていません。')
   }
+  if (!Array.isArray(settings.shortcutsAdded)) {
+    const migrated = { ...settings, shortcutsAdded: [] }
+    await database.put('settings', migrated)
+    return migrated
+  }
   return settings
+}
+
+export async function saveShortcutAdded(shortcut: ShortcutKind): Promise<AppSettings> {
+  const database = await readyDatabasePromise
+  const settings = await getAppSettings()
+  const shortcutsAdded = settings.shortcutsAdded.includes(shortcut)
+    ? settings.shortcutsAdded
+    : [...settings.shortcutsAdded, shortcut]
+  const updated = { ...settings, shortcutsAdded }
+  await database.put('settings', updated)
+  return updated
 }
 
 export async function saveAuthenticatedOwner(uid: string): Promise<AppSettings> {

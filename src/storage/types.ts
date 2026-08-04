@@ -31,6 +31,7 @@ export interface HistoryEntry {
 }
 
 export type SetupStage = 'not-started' | 'authenticated' | 'offline-ready' | 'complete'
+export type ShortcutKind = 'wake' | 'sleep' | 'memo' | 'history'
 
 export interface AppSettings {
   key: 'main'
@@ -38,6 +39,7 @@ export interface AppSettings {
   deviceId: string
   lastSyncAt: string | null
   setupStage: SetupStage
+  shortcutsAdded: ShortcutKind[]
   dataVersion: number
 }
 

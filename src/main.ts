@@ -26,12 +26,13 @@ import {
   resolveRecordConflict,
   saveAuthenticatedOwner,
   saveOfflineReady,
+  saveShortcutAdded,
   softDeleteRecord,
   updateMemoBody,
   updateRecord,
   type RecordChanges,
 } from './storage/database'
-import type { HistoryEntry, RecordData, SyncStatus } from './storage/types'
+import type { HistoryEntry, RecordData, ShortcutKind, SyncStatus } from './storage/types'
 import { uploadNewRecord } from './sync/upload'
 import { syncPendingNewRecords } from './sync/run'
 import { checkOfflineReadiness } from './offline/readiness'
@@ -224,6 +225,21 @@ async function renderSetup(authMessage = ''): Promise<void> {
   }
   const trustedDevice = isDailyUseConfigured(settings)
   const offlineReady = settings.setupStage === 'offline-ready' || settings.setupStage === 'complete'
+  const shortcutOrder: ShortcutKind[] = ['wake', 'sleep', 'memo', 'history']
+  const shortcutLabels: Record<ShortcutKind, string> = { wake: '起床', sleep: '就寝', memo: 'メモ', history: '履歴' }
+  const nextShortcut = shortcutOrder.find((shortcut) => !settings.shortcutsAdded.includes(shortcut))
+  const shortcutsComplete = nextShortcut === undefined
+  const shortcutGuide = shortcutOrder.map((shortcut, index) => {
+    const complete = settings.shortcutsAdded.includes(shortcut)
+    const available = complete || shortcut === nextShortcut
+    const destination = shortcut === 'history' ? `${BASE_URL}history/` : `${BASE_URL}${shortcut}/?install=1`
+    return `<li class="shortcut-step ${complete ? 'complete' : available ? 'current' : 'locked'}">
+      <strong>${index + 1}. ${shortcutLabels[shortcut]}</strong>
+      ${complete ? '<span>✓ ホーム画面に追加済み</span>' : available ? `<span>通常Chromeで準備ページを開き、︙→「ホーム画面に追加」→「ショートカットを作成」を選びます。</span>
+        <a class="secondary-link" href="${destination}">${shortcutLabels[shortcut]}の準備ページを開く</a>
+        <button class="primary-button" type="button" data-shortcut-added="${shortcut}">ホーム画面に追加できた</button>` : '<span>前の入口を確認すると進めます。</span>'}
+    </li>`
+  }).join('')
 
   app.innerHTML = `
     <section class="shell setup-shell" aria-labelledby="page-title">
@@ -237,7 +253,7 @@ async function renderSetup(authMessage = ''): Promise<void> {
         <li class="complete"><strong>使い方を確認</strong><span>端末保存を先に行い、圏外でも打刻します。</span></li>
         <li class="${trustedDevice ? 'complete' : 'current'}"><strong>Googleで本人確認</strong><span>${trustedDevice ? '✓ この端末は本人確認済みです。' : '本人の記録だけへ接続します。'}</span></li>
         <li class="${offlineReady ? 'complete' : trustedDevice ? 'current' : ''}"><strong>オフライン準備</strong><span>${offlineReady ? '✓ 必要な画面をこの端末に保存済みです。' : '必要な画面が端末に保存されたか検査します。'}</span></li>
-        <li><strong>ホーム画面へ追加</strong><span>起床・就寝・メモ・履歴の入口を作ります。</span></li>
+        <li class="${shortcutsComplete ? 'complete' : offlineReady ? 'current' : ''}"><strong>ホーム画面へ追加</strong><span>${shortcutsComplete ? '✓ 四つの入口を確認済みです。' : '起床・就寝・メモ・履歴の入口を順に作ります。'}</span></li>
       </ol>
       <section class="setup-auth" aria-labelledby="auth-title">
         <h2 id="auth-title">2. Googleで本人確認</h2>
@@ -259,13 +275,9 @@ async function renderSetup(authMessage = ''): Promise<void> {
       ${trustedDevice ? `<section class="offline-check" aria-labelledby="offline-title"><h2 id="offline-title">3. オフライン準備</h2>
         ${offlineCheck === 'ready' ? '<p class="result-message success">✓ オフライン準備完了</p><p class="help">起床・就寝・メモ・履歴に必要なファイルを端末内で確認しました。</p>' : '<p class="result-message">⚠ オフライン準備を確認できませんでした。</p><button class="primary-button" type="button" data-offline-retry>もう一度検査</button>'}
       </section>` : ''}
-      ${trustedDevice ? `<section class="setup-next" aria-labelledby="next-title"><h2 id="next-title">次の準備</h2>
-        <nav class="entry-grid" aria-label="ホーム画面入口の準備">
-          <a class="entry wake" href="${BASE_URL}wake/?install=1">起床を準備</a>
-          <a class="entry sleep" href="${BASE_URL}sleep/?install=1">就寝を準備</a>
-          <a class="entry memo" href="${BASE_URL}memo/?install=1">メモを準備</a>
-          <a class="entry history" href="${BASE_URL}history/">履歴を見る</a>
-        </nav><p class="help">本人確認前の端末では、打刻・履歴を開きません。</p></section>` : ''}
+      ${offlineReady ? `<section class="setup-next" aria-labelledby="next-title"><h2 id="next-title">4. ホーム画面へ追加</h2>
+        <p class="help">必ず通常Chromeで操作します。既に同じ4アイコンがある場合は、作り直さず「追加できた」を順に押してください。</p>
+        <ol class="shortcut-steps">${shortcutGuide}</ol></section>` : ''}
     </section>
   `
 
@@ -283,6 +295,12 @@ async function renderSetup(authMessage = ''): Promise<void> {
     await renderSetup()
   })
   app.querySelector<HTMLButtonElement>('[data-offline-retry]')?.addEventListener('click', () => void renderSetup())
+  for (const button of app.querySelectorAll<HTMLButtonElement>('[data-shortcut-added]')) {
+    button.addEventListener('click', async () => {
+      await saveShortcutAdded(button.dataset.shortcutAdded as ShortcutKind)
+      await renderSetup()
+    })
+  }
 }
 
 function renderSetupRequired(): void {

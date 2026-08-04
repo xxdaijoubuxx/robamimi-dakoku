@@ -154,6 +154,11 @@ h1 {
 .setup-auth summary { color: #625a52; cursor: pointer; }
 .setup-next { display: grid; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #d8cec0; }
 .setup-next h2 { margin: 0; }
+.shortcut-steps { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.shortcut-step { display: grid; gap: 10px; padding: 16px; border: 1px solid #d8cec0; border-radius: 14px; background: #fffdf9; }
+.shortcut-step span { color: #71675e; line-height: 1.6; }
+.shortcut-step.complete { border-color: #91b397; }
+.shortcut-step.locked { opacity: .65; }
 .offline-check { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #d8cec0; }
 .offline-check h2, .offline-check p { margin: 0; }
 

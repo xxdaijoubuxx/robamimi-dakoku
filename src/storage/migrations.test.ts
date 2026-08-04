@@ -10,6 +10,7 @@ describe('端末内データ移行', () => {
       deviceId: 'device-1',
       lastSyncAt: null,
       setupStage: 'not-started',
+      shortcutsAdded: [],
       dataVersion: DATA_VERSION,
     })
   })
