@@ -43,6 +43,7 @@ import {
 import type { HistoryEntry, RecordData, ShortcutKind, SyncStatus } from './storage/types'
 import { uploadNewRecord } from './sync/upload'
 import { syncPendingNewRecords } from './sync/run'
+import { canAttemptSync } from './sync/availability'
 import { checkOfflineReadiness } from './offline/readiness'
 import { downloadRecordsCsv } from './csv/download'
 import { statusAttentionCount, type AppStatusSummary } from './status/summary'
@@ -833,6 +834,10 @@ async function renderAppStatus(): Promise<void> {
   app.querySelector<HTMLButtonElement>('[data-status-sync]')?.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement
     const message = app.querySelector<HTMLElement>('[data-status-message]')
+    if (!canAttemptSync(navigator.onLine)) {
+      if (message) message.textContent = '↻ 圏外のため同期できません。記録は端末内で同期待ちになっています。'
+      return
+    }
     button.disabled = true
     button.textContent = '同期中…'
     if (message) message.textContent = 'Firebaseとの同期を確認しています。'
@@ -883,6 +888,7 @@ async function renderHistory(): Promise<void> {
           <p class="csv-export-status" data-csv-status aria-live="polite"></p>
         </div>
         <button class="primary-button" type="button" data-sync-retry>同期を再試行</button>
+        <p class="help" data-sync-message aria-live="polite"></p>
         <a class="secondary-link" href="${BASE_URL}">設定入口へ戻る</a>
         <a class="text-link" href="${BASE_URL}history/?deleted=1">最近削除した記録</a>
       </div>
@@ -918,6 +924,11 @@ async function renderHistory(): Promise<void> {
 
   app.querySelector<HTMLButtonElement>('[data-sync-retry]')?.addEventListener('click', async (event) => {
     const button = event.currentTarget as HTMLButtonElement
+    const message = app.querySelector<HTMLElement>('[data-sync-message]')
+    if (!canAttemptSync(navigator.onLine)) {
+      if (message) message.textContent = '↻ 圏外のため同期できません。記録は端末内で同期待ちになっています。'
+      return
+    }
     button.disabled = true
     button.textContent = '同期中…'
     await syncPendingNewRecords()
@@ -926,6 +937,7 @@ async function renderHistory(): Promise<void> {
 }
 
 function startBackgroundSync(refreshHistory = false): void {
+  if (!canAttemptSync(navigator.onLine)) return
   void syncPendingNewRecords()
     .then(async (result) => {
       if (refreshHistory && result.total > 0) await renderHistory()
