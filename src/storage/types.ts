@@ -51,7 +51,7 @@ export type DiagnosticOperation =
   | 'local-record-save' | 'local-record-delete' | 'local-record-restore' | 'memo-body-save'
   | 'sync-run-start' | 'sync-run' | 'sync-record' | 'google-sign-in' | 'google-sign-out'
   | 'conflict-detected' | 'conflict-resolved' | 'csv-export' | 'diagnostics-export'
-  | 'offline-readiness' | 'service-worker-register'
+  | 'offline-readiness' | 'service-worker-register' | 'service-worker-update-ready'
 
 export interface DiagnosticLog {
   id?: number

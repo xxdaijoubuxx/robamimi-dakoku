@@ -22,6 +22,29 @@ body,
   min-height: 100vh;
 }
 
+.update-notice {
+  position: fixed;
+  z-index: 10;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+  display: grid;
+  gap: 4px;
+  max-width: 440px;
+  margin: auto;
+  padding: 14px 16px;
+  border: 1px solid #a87a24;
+  border-radius: 14px;
+  color: #2d2925;
+  background: #fff6df;
+  box-shadow: 0 6px 24px rgb(45 41 37 / 20%);
+}
+
+.update-notice span {
+  font-size: .9rem;
+  line-height: 1.5;
+}
+
 #app {
   display: grid;
   place-items: center;

@@ -48,6 +48,7 @@ import { downloadRecordsCsv } from './csv/download'
 import { statusAttentionCount, type AppStatusSummary } from './status/summary'
 import { safeErrorCode, writeDiagnosticLog } from './diagnostics/log'
 import { downloadDiagnosticExport } from './diagnostics/export'
+import { watchForServiceWorkerUpdate } from './offline/update'
 
 const BASE_URL = import.meta.env.BASE_URL
 
@@ -748,6 +749,17 @@ function lastSyncLabel(summary: AppStatusSummary): string {
   return summary.lastSyncAt ? formatDateTime(summary.lastSyncAt) : 'まだありません'
 }
 
+function showUpdateReady(): void {
+  if (document.querySelector('[data-update-ready]')) return
+  const notice = document.createElement('aside')
+  notice.className = 'update-notice'
+  notice.dataset.updateReady = 'true'
+  notice.setAttribute('role', 'status')
+  notice.innerHTML = '<strong>更新の準備ができました</strong><span>安全に切り替えるため、この画面を閉じてからもう一度開いてください。</span>'
+  document.body.append(notice)
+  void writeDiagnosticLog('service-worker-update-ready', 'success')
+}
+
 async function renderAppStatus(): Promise<void> {
   const summary = await getAppStatusSummary()
   const diagnosticLogs = await getDiagnosticLogsNewestFirst()
@@ -761,6 +773,7 @@ async function renderAppStatus(): Promise<void> {
       <p class="eyebrow">本文を含まない確認情報</p>
       <h1 id="page-title">アプリ状態</h1>
       <dl class="status-card app-status-card">
+        <div><dt>アプリ版</dt><dd>${__APP_VERSION__}</dd></div>
         <div><dt>通信</dt><dd>${navigator.onLine ? 'オンライン' : 'オフライン'}</dd></div>
         <div><dt>Googleログイン</dt><dd>${login}</dd></div>
         <div><dt>端末内記録</dt><dd>${summary.recordCount}件</dd></div>
@@ -918,7 +931,11 @@ async function registerServiceWorker(): Promise<void> {
     return
   }
   try {
-    await navigator.serviceWorker.register(`${BASE_URL}sw.js`, { scope: BASE_URL })
+    const registration = await navigator.serviceWorker.register(`${BASE_URL}sw.js`, { scope: BASE_URL })
+    watchForServiceWorkerUpdate(registration, showUpdateReady)
+    void registration.update().catch((error: unknown) => {
+      console.error('Service Workerの更新確認に失敗しました。', error)
+    })
     await writeDiagnosticLog('service-worker-register', 'success')
   } catch (error) {
     console.error('Service Workerを登録できませんでした。', error)
