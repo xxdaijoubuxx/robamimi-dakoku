@@ -40,6 +40,7 @@ export interface AppSettings {
   lastSyncAt: string | null
   setupStage: SetupStage
   shortcutsAdded: ShortcutKind[]
+  setupTestRecordId: string | null
   dataVersion: number
 }
 

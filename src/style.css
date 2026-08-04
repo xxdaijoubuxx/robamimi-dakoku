@@ -161,6 +161,8 @@ h1 {
 .shortcut-step.locked { opacity: .65; }
 .offline-check { display: grid; gap: 10px; margin-top: 24px; padding-top: 20px; border-top: 1px solid #d8cec0; }
 .offline-check h2, .offline-check p { margin: 0; }
+.setup-test { display: grid; gap: 12px; margin-top: 28px; padding-top: 20px; border-top: 1px solid #d8cec0; }
+.setup-test h2, .setup-test p { margin: 0; }
 
 .setup-auth h2,
 .setup-auth p {

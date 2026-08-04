@@ -11,6 +11,7 @@ describe('端末内データ移行', () => {
       lastSyncAt: null,
       setupStage: 'not-started',
       shortcutsAdded: [],
+      setupTestRecordId: null,
       dataVersion: DATA_VERSION,
     })
   })

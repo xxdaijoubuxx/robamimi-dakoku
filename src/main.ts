@@ -17,16 +17,20 @@ import {
 import { completedLaunchUrl, launchMode } from './prototype/launch'
 import type { EntryKind } from './prototype/types'
 import {
+  createRecord,
   getHistoryEntries,
   getAppSettings,
   getRecentlyDeletedRecords,
   getRecordConflict,
+  getSetupTestState,
   getRecordById,
   restoreRecord,
   resolveRecordConflict,
   saveAuthenticatedOwner,
   saveOfflineReady,
   saveShortcutAdded,
+  saveSetupTestRecord,
+  completeSetupTest,
   softDeleteRecord,
   updateMemoBody,
   updateRecord,
@@ -228,6 +232,8 @@ async function renderSetup(authMessage = ''): Promise<void> {
   const shortcutLabels: Record<ShortcutKind, string> = { wake: '起床', sleep: '就寝', memo: 'メモ', history: '履歴' }
   const nextShortcut = shortcutOrder.find((shortcut) => !settings.shortcutsAdded.includes(shortcut))
   const shortcutsComplete = nextShortcut === undefined
+  const setupTest = await getSetupTestState()
+  const setupComplete = settings.setupStage === 'complete'
   const shortcutGuide = shortcutOrder.map((shortcut, index) => {
     const complete = settings.shortcutsAdded.includes(shortcut)
     const available = complete || shortcut === nextShortcut
@@ -277,6 +283,13 @@ async function renderSetup(authMessage = ''): Promise<void> {
       ${offlineReady ? `<section class="setup-next" aria-labelledby="next-title"><h2 id="next-title">4. ホーム画面へ追加</h2>
         <p class="help">必ず通常Chromeで操作します。既に同じ4アイコンがある場合は、作り直さず「追加できた」を順に押してください。</p>
         <ol class="shortcut-steps">${shortcutGuide}</ol></section>` : ''}
+      ${shortcutsComplete ? `<section class="setup-test" aria-labelledby="test-title"><h2 id="test-title">5. 保存と同期をテスト</h2>
+        ${setupComplete ? '<p class="result-message success">✓ テスト記録の作成・同期・削除が完了しました</p>'
+          : !setupTest ? '<p class="help">専用メモを1件作り、通常の端末保存とFirebase同期を確認します。</p><button class="primary-button" type="button" data-create-setup-test>テスト記録を作成</button>'
+          : setupTest.record.deletedAt !== null ? '<p class="result-message">削除を同期中です…</p>'
+          : setupTest.status === 'synced' ? '<p class="result-message success">✓ 端末保存・Firebase同期済み</p><p class="help">確認用記録を削除し、Firebaseにも削除を同期します。</p><button class="danger-button" type="button" data-delete-setup-test>テスト記録を削除</button>'
+          : `<p class="result-message">↻ 同期中（${escapeHtml(setupTest.status)}）</p><button class="primary-button" type="button" data-retry-setup-test>同期を再試行</button>`}
+      </section>` : ''}
     </section>
   `
 
@@ -300,6 +313,24 @@ async function renderSetup(authMessage = ''): Promise<void> {
       await renderSetup()
     })
   }
+  app.querySelector<HTMLButtonElement>('[data-create-setup-test]')?.addEventListener('click', async () => {
+    const record = await createRecord('memo')
+    await updateMemoBody(record.id, '初回設定テスト')
+    await saveSetupTestRecord(record.id)
+    await syncPendingNewRecords()
+    await renderSetup()
+  })
+  app.querySelector<HTMLButtonElement>('[data-retry-setup-test]')?.addEventListener('click', async () => {
+    await syncPendingNewRecords()
+    await renderSetup()
+  })
+  app.querySelector<HTMLButtonElement>('[data-delete-setup-test]')?.addEventListener('click', async () => {
+    if (!setupTest) return
+    await softDeleteRecord(setupTest.record.id)
+    await syncPendingNewRecords()
+    await completeSetupTest()
+    await renderSetup()
+  })
 }
 
 function renderSetupRequired(): void {

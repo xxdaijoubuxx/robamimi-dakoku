@@ -11,6 +11,7 @@ export function createInitialSettings(deviceId: string): AppSettings {
     lastSyncAt: null,
     setupStage: 'not-started',
     shortcutsAdded: [],
+    setupTestRecordId: null,
     dataVersion: DATA_VERSION,
   }
 }

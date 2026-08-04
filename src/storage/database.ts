@@ -115,12 +115,39 @@ export async function getAppSettings(): Promise<AppSettings> {
   if (!settings) {
     throw new Error('端末設定が初期化されていません。')
   }
-  if (!Array.isArray(settings.shortcutsAdded)) {
-    const migrated = { ...settings, shortcutsAdded: [] }
+  if (!Array.isArray(settings.shortcutsAdded) || !('setupTestRecordId' in settings)) {
+    const migrated = {
+      ...settings,
+      shortcutsAdded: Array.isArray(settings.shortcutsAdded) ? settings.shortcutsAdded : [],
+      setupTestRecordId: 'setupTestRecordId' in settings ? settings.setupTestRecordId : null,
+    }
     await database.put('settings', migrated)
     return migrated
   }
   return settings
+}
+
+export async function saveSetupTestRecord(recordId: string): Promise<void> {
+  const database = await readyDatabasePromise
+  const settings = await getAppSettings()
+  await database.put('settings', { ...settings, setupTestRecordId: recordId })
+}
+
+export async function getSetupTestState(): Promise<{ record: RecordData; status: SyncStatus } | null> {
+  const database = await readyDatabasePromise
+  const settings = await getAppSettings()
+  if (!settings.setupTestRecordId) return null
+  const transaction = database.transaction(['records', 'sync'])
+  const record = await transaction.objectStore('records').get(settings.setupTestRecordId)
+  const sync = await transaction.objectStore('sync').get(settings.setupTestRecordId)
+  await transaction.done
+  return record && isCurrentRecord(record) ? { record, status: sync?.status ?? 'pending' } : null
+}
+
+export async function completeSetupTest(): Promise<void> {
+  const database = await readyDatabasePromise
+  const settings = await getAppSettings()
+  await database.put('settings', { ...settings, setupTestRecordId: null, setupStage: 'complete' })
 }
 
 export async function saveShortcutAdded(shortcut: ShortcutKind): Promise<AppSettings> {
