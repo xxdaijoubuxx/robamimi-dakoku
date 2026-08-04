@@ -6,7 +6,7 @@ describe('端末内診断ログ', () => {
     expect(createDiagnosticLog('memo-body-save', 'success', {
       occurredAt: '2026-08-04T01:00:00.000Z', recordId: 'record-1',
     })).toEqual({
-      occurredAt: '2026-08-04T01:00:00.000Z', appVersion: '0.1.1', operation: 'memo-body-save',
+      occurredAt: '2026-08-04T01:00:00.000Z', appVersion: '0.1.2', operation: 'memo-body-save',
       outcome: 'success', errorCode: null, recordId: 'record-1',
     })
   })

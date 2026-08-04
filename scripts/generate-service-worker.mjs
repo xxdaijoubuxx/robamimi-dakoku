@@ -38,7 +38,7 @@ const BASE_PATH = ${JSON.stringify(basePath)}
 const PRECACHE_URLS = ${JSON.stringify(precacheUrls, null, 2)}
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)))
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => self.skipWaiting()))
 })
 
 self.addEventListener('activate', (event) => {
@@ -81,6 +81,10 @@ self.addEventListener('fetch', (event) => {
 })
 
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'ACTIVATE_UPDATE') {
+    event.waitUntil(self.skipWaiting())
+    return
+  }
   if (event.data?.type !== 'CHECK_OFFLINE_READY' || !event.ports[0]) return
   event.waitUntil(
     caches.open(CACHE_NAME)

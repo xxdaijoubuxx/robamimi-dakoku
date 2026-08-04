@@ -749,14 +749,21 @@ function lastSyncLabel(summary: AppStatusSummary): string {
   return summary.lastSyncAt ? formatDateTime(summary.lastSyncAt) : 'まだありません'
 }
 
-function showUpdateReady(): void {
+function showUpdateReady(worker: ServiceWorker): void {
   if (document.querySelector('[data-update-ready]')) return
   const notice = document.createElement('aside')
   notice.className = 'update-notice'
   notice.dataset.updateReady = 'true'
   notice.setAttribute('role', 'status')
-  notice.innerHTML = '<strong>更新の準備ができました</strong><span>安全に切り替えるため、この画面を閉じてからもう一度開いてください。</span>'
+  notice.innerHTML = '<strong>更新の準備ができました</strong><span>新版の保存は完了しています。打刻データを残したまま切り替えます。</span><button class="primary-button" type="button" data-activate-update>更新する</button>'
   document.body.append(notice)
+  notice.querySelector<HTMLButtonElement>('[data-activate-update]')?.addEventListener('click', (event) => {
+    const button = event.currentTarget as HTMLButtonElement
+    button.disabled = true
+    button.textContent = '更新中…'
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true })
+    worker.postMessage({ type: 'ACTIVATE_UPDATE' })
+  })
   void writeDiagnosticLog('service-worker-update-ready', 'success')
 }
 
