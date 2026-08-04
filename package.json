@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build && node scripts/generate-service-worker.mjs",
     "check": "tsc -b",
     "test": "vitest run",
-    "test:rules": "JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64 PATH=/usr/lib/jvm/java-21-openjdk-amd64/bin:$PATH firebase emulators:exec --only firestore --project demo-robamimi-dakoku \"vitest run src/firebase/firestore.rules.test.ts\"",
+    "test:rules": "sh -c 'export JAVA_HOME=\"${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}\"; export PATH=\"$JAVA_HOME/bin:$PATH\"; firebase emulators:exec --only firestore --project demo-robamimi-dakoku \"vitest run --config vitest.rules.config.ts\"'",
     "test:watch": "vitest",
     "preview": "vite preview"
   },

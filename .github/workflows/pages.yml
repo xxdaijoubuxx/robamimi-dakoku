@@ -26,6 +26,12 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
@@ -37,6 +43,9 @@ jobs:
 
       - name: Run tests
         run: npm test
+
+      - name: Test Firestore Security Rules
+        run: npm run test:rules
 
       - name: Build site
         run: npm run build
